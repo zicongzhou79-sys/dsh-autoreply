@@ -141,7 +141,7 @@ window.__ModuleLoader__.load({
     color: var(--dsw-alias-label-primary, #e6edf3); background: var(--dsw-alias-bg-layer-1, rgba(0,0,0,.12)); font-size: 12px; }
   .qqa-session-list { max-height: 150px; overflow-y: auto; }
   .qqa-error { color: var(--dsw-alias-state-error-primary, #f85149); margin: 6px 0; }
-  .qqa-topbar { display: flex; align-items: center; gap: 10px; padding: 2px 0 12px; margin-bottom: 14px; border-bottom: 1px solid var(--dsw-alias-border-l1,rgba(128,128,128,.15)); position: sticky; top: 0; z-index: 2; background: var(--dsw-alias-bg-overlay,rgba(17,20,25,.98)); }
+  .qqa-topbar { display: flex; align-items: center; gap: 10px; padding: 16px 20px 12px; margin: -20px -20px 14px; border-bottom: 1px solid var(--dsw-alias-border-l1,rgba(128,128,128,.15)); position: sticky; top: -20px; z-index: 2; background: var(--dsw-alias-bg-overlay,rgba(17,20,25,.98)); }
   .qqa-topbar-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 400; color: var(--dsw-alias-label-primary,#e6edf3); white-space: nowrap; }
   .qqa-brand-icon { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 6px; background: var(--dsw-alias-label-primary,#e6edf3); color: #111; font-size: 10px; font-weight: 700; }
   .qqa-topbar-status { display: flex; align-items: center; gap: 5px; color: var(--dsw-alias-label-secondary,#8a8f98); font-size: 11px; white-space: nowrap; }
