@@ -148,6 +148,7 @@ window.__ModuleLoader__.load({
   .qqa-topbar .spacer { flex: 1; }
   .qqa-login-actions { display: flex; gap: 6px; margin-top: 6px; }
   .qqa-binding-top { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .qqa-rule-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .qqa-login-actions .qqa-btn { flex: 1; min-width: 0; padding: 6px 4px; border: 1px solid var(--dsw-alias-border-l1,rgba(128,128,128,.2)); border-radius: 6px; background: var(--dsw-alias-bg-layer-1,rgba(0,0,0,.04)); color: var(--dsw-alias-label-primary,#e6edf3); font-size: 11px; cursor: pointer; white-space: nowrap; }
   .qqa-login-actions .qqa-btn:hover { border-color: var(--dsw-alias-brand-primary,#58a6ff); }
   .qqa-bind-list { display: grid; gap: 6px; margin-top: 8px; }
@@ -316,14 +317,23 @@ function RulesSection() {
           setValues({ private_auto: !!e.private_auto, group_mode: e.group_mode || 'mention' });
         }).catch(() => {});
       }, []);
+      const save = (patch) => arExec('config_set', { batch: patch }).catch((e) => alert(e.message || String(e)));
       const field = (key, label, node) => React.createElement('div', { className: 'qqa-field', key }, React.createElement('label', null, label), node);
       return React.createElement('div', { className: 'qqa-section' },
         React.createElement('h4', null, '回复规则'),
-        field('private', '私聊触发', React.createElement('select', { className: 'qqa-select', value: values.private_auto ? 'on' : 'off', onChange: (e) => setValues((v) => ({ ...v, private_auto: e.target.value === 'on' })) }, React.createElement('option', { value: 'on' }, '自动回复全部私聊'), React.createElement('option', { value: 'off' }, '关闭私聊自动回复'))),
-        field('mode', '群聊触发', React.createElement('select', { className: 'qqa-select', value: values.group_mode, onChange: (e) => setValues((v) => ({ ...v, group_mode: e.target.value })) }, React.createElement('option', { value: 'mention' }, '被 @ 时回复'), React.createElement('option', { value: 'keyword' }, '关键词命中时回复'), React.createElement('option', { value: 'all' }, '全部消息回复'), React.createElement('option', { value: 'off' }, '关闭群聊自动回复'))),
-        React.createElement('button', { className: 'qqa-btn-primary', onClick: async () => { try { await arExec('config_set', { batch: { 'engine.private_auto': values.private_auto, 'engine.group_mode': values.group_mode } }); } catch (e) { alert(e.message || String(e)); } } }, '保存规则'),
+        React.createElement('div', { className: 'qqa-rule-grid' },
+          field('private', '私聊触发', React.createElement('select', { className: 'qqa-select', value: values.private_auto ? 'on' : 'off', onChange: (e) => { const v = e.target.value === 'on'; setValues((old) => ({ ...old, private_auto: v })); save({ 'engine.private_auto': v }); } },
+            React.createElement('option', { value: 'on' }, '自动回复全部私聊'),
+            React.createElement('option', { value: 'off' }, '关闭私聊自动回复'))),
+          field('mode', '群聊触发', React.createElement('select', { className: 'qqa-select', value: values.group_mode, onChange: (e) => { const v = e.target.value; setValues((old) => ({ ...old, group_mode: v })); save({ 'engine.group_mode': v }); } },
+            React.createElement('option', { value: 'mention' }, '被 @ 时回复'),
+            React.createElement('option', { value: 'keyword' }, '关键词命中时回复'),
+            React.createElement('option', { value: 'all' }, '全部消息回复'),
+            React.createElement('option', { value: 'off' }, '关闭群聊自动回复'))),
+        ),
       );
     }
+
     function ChatSection({ sessions, logs }) {
       const list = sessions || [];
       const [chatKey, setChatKey] = React.useState('');
