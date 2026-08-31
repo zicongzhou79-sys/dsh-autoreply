@@ -29,6 +29,7 @@
 - [x] 模拟聊天展示 DSH 失败信息，并标注“未发送到 QQ”。
 - [x] 会话绑定支持 Agent preset、模型、Workspace、Session ID。
 - [x] DSH 页面可见 `QQ 自动回复` 入口。
+- [x] 通过只读浏览器脚本提取页面正文，确认入口文本存在于当前 DSH Web 页面。
 
 ## 2. 自动验证证据
 
