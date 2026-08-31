@@ -1,0 +1,17 @@
+# 运行时数据（不提交）
+data/
+logs/
+*.log
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# 本地配置（含密钥）
+backend/config.yaml
+
+# 前端构建产物（若未来启用）
+frontend/dist/
+frontend/node_modules/

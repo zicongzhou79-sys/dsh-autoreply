@@ -1,0 +1,7 @@
+# dsh-qq-autoreply bundle patch: inserts the QQ AutoReply integration plugin
+# into the web profile roster. The host half calls AutoReply's REST API for
+# config/status/session/log tools and exposes /dsh-qq/* routes. The client half
+# renders the DSH control panel and model/workspace selectors.
+- insert:
+    - id: qq-autoreply
+      name: 'dsh-qq-autoreply'

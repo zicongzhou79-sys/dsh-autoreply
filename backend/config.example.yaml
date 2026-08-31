@@ -1,0 +1,44 @@
+server:
+  host: 0.0.0.0
+  port: 8001
+  webui_token: ''
+onebot:
+  ws_path: /onebot/ws
+  access_token: ***REDACTED***
+  heartbeat_timeout_s: 90
+llm:
+  provider: ''             # DSH provider ID
+  model: ''                # DSH model ID
+  temperature: 0.7
+  max_tokens: 500
+  timeout_s: 60
+engine:
+  master_switch: true
+  private_auto: true
+  group_mode: mention
+  group_keywords: []
+  whitelist:
+    friends: []
+    groups: []
+  blacklist:
+    friends: []
+    groups: []
+  rate_limit:
+    per_session_per_min: 10
+    daily_per_session: 300
+  context_n: 12
+  workspace_dir: ''
+  session_dir: ''
+  sensitive_words: []
+  dsh:
+    enabled: true          # 模型生成和工具调用均通过 DSH
+    base_url: http://127.0.0.1:3081
+    health_path: /dsh-qq/health
+    tool_path: /dsh-qq/execute
+    persona_path: /dsh-qq/persona
+    reply_tools: []         # 回复前可用的 DSH 工具白名单，如 [web_search]
+    agent_preset: ''
+    timeout_s: 10
+persona:
+  name: ''
+  system_prompt: 你是{name}。你正在代替 QQ 账号本人回复消息，请以本人的语气、简洁自然地回复。不要声称自己是 AI。

@@ -1,0 +1,42 @@
+{
+  "name": "dsh-qq-autoreply",
+  "version": "0.2.0",
+  "description": "DeepSeek Harness ↔ QQ AutoReply 互通插件：DSH 会话可通过工具查看/修改 AutoReply 配置、状态、会话与日志，并向 AutoReply 暴露 /dsh-qq/* 端点供其调用 DSH 工具增强回复；WebUI 内置 AutoReply 状态面板（client）。",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "qq",
+    "autoreply",
+    "napcat",
+    "onebot"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [],
+      "platform": "web"
+    }
+  },
+  "peerDependencies": {
+    "react": "^18.2.0"
+  }
+}
