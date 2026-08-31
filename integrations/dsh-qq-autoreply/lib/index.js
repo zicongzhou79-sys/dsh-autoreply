@@ -10,7 +10,7 @@
  */
 
 export const name = 'dsh-qq-autoreply'
-export const inject = ['webServer', 'tools', 'systemPrompt', 'llm', 'sessions']
+export const inject = ['webServer', 'tools', 'systemPrompt', 'llm', 'sessions', 'agents']
 
 const DEFAULT_URL = process.env.AUTOREPLY_URL || 'http://127.0.0.1:8001'
 const AUTOREPLY_KEY = process.env.AUTOREPLY_TOKEN || '' // Bearer token if AutoReply requires one (empty = open)
@@ -22,7 +22,7 @@ import { request as httpRequest } from 'node:http'
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 
-import { createMessage } from '@deepseek-ai/dsh-llm'
+import { createMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 
 const AUTOREPLY_DIR = process.env.AUTOREPLY_DIR || ' /home/user/Data/AutoReply'
 const START_SCRIPT = process.env.AUTOREPLY_START_SCRIPT || `${AUTOREPLY_DIR}/scripts/start.sh`
@@ -241,7 +241,21 @@ async function runSessionTurn(ctx, body) {
   const model = String(body.model || '')
   if (!sessionId || !text || !provider || !model) throw new Error('session_id/text/provider/model required')
   const session = ctx.sessions.get(sessionId)
-  if (!session) throw new Error(`DSH Session 不存在: ${sessionId}`)
+  if (!session && !ctx.agents) throw new Error(`DSH Session 不存在: ${sessionId}`)
+  if (ctx.agents) {
+    let agent = ctx.agents.get(sessionId)
+    if (!agent) {
+      const handle = session
+        ? await ctx.agents.resume({ resumeSessionId: sessionId, agentOptions: { provider, model, maxTokens: body.max_tokens } })
+        : await ctx.agents.create({ sessionId, meta: { cwd: body.workspace_id || undefined, agentPreset: body.agent_preset || undefined }, agentOptions: { provider, model, maxTokens: body.max_tokens } })
+      agent = handle.agent
+    }
+    agent.inject(createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } }))
+    await agent.whenIdle()
+    const messages = agent.session.deriveMessages()
+    const last = [...messages].reverse().find((message) => message.role === 'assistant')
+    return { provider, model, session_id: sessionId, content: last ? last.content.map((part) => part.type === 'text' ? part.text : '').join('') : '' }
+  }
   const userMessage = createMessage({ role: 'user', content: [{ type: 'text', text }], source: { kind: 'user' } })
   const userEvent = session.append('user/message', userMessage, { surfaceOp: 'append', sourceEventSeqs: [] })
   let content = ''
@@ -260,6 +274,11 @@ async function handleDshSession(ctx, body) {
   const action = body.action || 'list'
   if (action === 'list') return { sessions: ctx.sessions.list().map((s) => ({ id: s.id, cwd: s.header.cwd, createdAt: s.header.createdAt })) }
   if (action === 'create') {
+    if (ctx.agents) {
+      const handle = await ctx.agents.create({ sessionId: body.id || `qqa-${Date.now()}`, meta: { cwd: body.workspace_id || undefined, agentPreset: body.agent_preset || undefined }, agentOptions: { provider: body.provider || undefined, model: body.model || undefined, maxTokens: body.max_tokens } })
+      const session = handle.agent.session
+      return { session: { id: session.id, cwd: session.header.cwd, createdAt: session.header.createdAt } }
+    }
     const session = ctx.sessions.create(body.id || undefined, { meta: { source: 'qq-autoreply', chatKey: body.chat_key || '' } })
     await ctx.sessions.flush(session)
     return { session: { id: session.id, cwd: session.header.cwd, createdAt: session.header.createdAt } }

@@ -189,7 +189,13 @@ class ReplyService:
                 sess = db.get_session(msg.chat_key)
             dsh_session_id = (sess or {}).get("dsh_session_id", "")
             if not dsh_session_id and hasattr(self.dsh, "create_session"):
-                dsh_session_id = await self.dsh.create_session(msg.chat_key)
+                dsh_session_id = await self.dsh.create_session(
+                    msg.chat_key,
+                    agent_preset=(sess or {}).get("agent_preset") or self.cfg.engine.dsh.agent_preset,
+                    provider=(sess or {}).get("model_provider") or self.cfg.llm.provider,
+                    model=(sess or {}).get("model_name") or self.cfg.llm.model,
+                    workspace_id=(sess or {}).get("workspace_dir") or self.cfg.engine.workspace_dir,
+                )
                 if dsh_session_id:
                     db.update_session_binding(msg.chat_key, dsh_session_id=dsh_session_id)
                     sess = db.get_session(msg.chat_key)

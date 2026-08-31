@@ -93,14 +93,16 @@ class DSHClient:
             raise DSHUnavailable(f"DSH 调用异常: {e.__class__.__name__}: {e}")
 
     # ---------- 人设同步 ----------
-    async def create_session(self, chat_key: str, session_id: str = "") -> str:
+    async def create_session(self, chat_key: str, session_id: str = "", *, agent_preset: str = "", provider: str = "", model: str = "", workspace_id: str = "") -> str:
         """Create a DSH-owned session and return its stable id."""
         if not self.enabled:
             raise DSHUnavailable("DSH 接入未启用")
         try:
             resp = await self._get_client().post(
                 f"{self.cfg.base_url.rstrip('/')}/dsh-qq/session",
-                json={"action": "create", "id": session_id or None, "chat_key": chat_key},
+                json={"action": "create", "id": session_id or None, "chat_key": chat_key,
+                      "agent_preset": agent_preset, "provider": provider, "model": model,
+                      "workspace_id": workspace_id},
             )
             if resp.status_code != 200:
                 raise DSHUnavailable(f"DSH Session HTTP {resp.status_code}: {resp.text[:200]}")
