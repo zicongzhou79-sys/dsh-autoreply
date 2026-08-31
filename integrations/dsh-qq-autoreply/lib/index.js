@@ -234,9 +234,22 @@ async function runSessionTurn(ctx, body) {
   let agent = ctx.agents.get(sessionId)
   if (!agent) {
     const setup = ctx.agentPresets ? async (agentCtx) => { await ctx.agentPresets.mount(agentCtx, body.agent_preset || undefined) } : undefined
-    const handle = session
-      ? await ctx.agents.resume({ resumeSessionId: sessionId, agentOptions: { provider, model, maxTokens: body.max_tokens }, setup })
-      : await ctx.agents.create({ sessionId, meta: { cwd: resolveCwd(body.workspace_id), agentPreset: body.agent_preset || undefined }, agentOptions: { provider, model, maxTokens: body.max_tokens }, setup })
+    const agentOptions = {
+      ...(provider ? { provider } : {}),
+      ...(model ? { model } : {}),
+      ...(body.max_tokens ? { maxTokens: body.max_tokens } : {}),
+    }
+    let handle
+    if (session) {
+      handle = await ctx.agents.resume({ resumeSessionId: sessionId, agentOptions, setup })
+    } else {
+      try {
+        // 优先恢复持久化存在的 Session；持久化不存在时再新建。
+        handle = await ctx.agents.resume({ resumeSessionId: sessionId, agentOptions, setup })
+      } catch (error) {
+        handle = await ctx.agents.create({ sessionId, meta: { cwd: resolveCwd(body.workspace_id), agentPreset: body.agent_preset || undefined }, agentOptions, setup })
+      }
+    }
     agent = handle.agent
   }
   agent.followup(makeMessage({ role: 'user', content: [{ type: 'text', text }], source: { kind: 'user' } }))

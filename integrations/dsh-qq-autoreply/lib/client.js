@@ -257,6 +257,7 @@ function SessionBindingEditor({ sessions, agents, workspaces, models, onSave, on
       const [agent, setAgent] = React.useState('');
       const [saving, setSaving] = React.useState(false);
       const list = sessions || [];
+      React.useEffect(() => { if (!workspace && workspaces && workspaces.length) setWorkspace(workspaces[0].path); }, [workspace, workspaces]);
       return React.createElement('div', { className: 'qqa-section' },
         React.createElement('h4', null, '会话绑定'),
         React.createElement('div', { className: 'qqa-binding-top' },
@@ -288,7 +289,7 @@ function SessionBindingEditor({ sessions, agents, workspaces, models, onSave, on
           onClick: async () => {
             setSaving(true);
             try {
-              await onSave({ chat_key: chatKey, agent_preset: agent, model_provider: model.split(':')[0] || '', model_name: model.split(':').slice(1).join(':'), workspace_dir: workspace });
+              await onSave({ chat_key: chatKey, agent_preset: agent, model_provider: model.split(':')[0] || '', model_name: model.split(':').slice(1).join(':'), workspace_dir: workspace || (workspaces && workspaces[0] && workspaces[0].path) || '' });
               setSaving(false);
             } catch (e) { setSaving(false); alert(e.message || String(e)); }
           } }, saving ? '保存中…' : '绑定会话'),
