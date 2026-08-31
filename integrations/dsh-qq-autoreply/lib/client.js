@@ -124,6 +124,11 @@ window.__ModuleLoader__.load({
   color: #f85149; }
 .qqa-btn-primary.on:hover:not(:disabled) { background: rgba(248,81,73,.22); }
 .qqa-btn-primary:disabled { opacity: .55; cursor: default; }
+.qqa-chat { display:flex; flex-direction:column; gap:6px; max-height:260px; overflow:auto; margin-top:8px; padding:8px; border:1px solid var(--dsw-alias-border-l1,rgba(128,128,128,.2)); border-radius:8px; }
+.qqa-chat-msg { display:flex; gap:8px; align-items:baseline; padding:5px 7px; background:var(--dsw-alias-bg-layer-1,rgba(0,0,0,.04)); border-radius:5px; }
+.qqa-chat-msg b { flex:none; font-size:11px; }
+.qqa-chat-msg span { min-width:0; white-space:pre-wrap; overflow-wrap:anywhere; }
+.qqa-chat-error { padding:6px 7px; color:var(--dsw-alias-state-error-primary,#f85149); background:rgba(248,81,73,.1); border-radius:5px; }
 .qqa-note { font-size: 11px; color: var(--dsw-alias-label-secondary, #8a8f98);
   word-break: break-word; line-height: 1.45; }
   .qqa-section { border-top: 1px solid var(--dsw-alias-border-l1, rgba(128,128,128,.15)); padding-top: 8px; margin-top: 8px; }
@@ -206,9 +211,9 @@ window.__ModuleLoader__.load({
       return items;
     }
 
-function SessionBindingEditor({ sessions, agents, workspaces, onSave }) {
+function SessionBindingEditor({ sessions, agents, workspaces, models, onSave }) {
       const [chatKey, setChatKey] = React.useState('');
-      const [agent, setAgent] = React.useState('');
+      const [model, setModel] = React.useState('');
       const [workspace, setWorkspace] = React.useState('');
       const [sessionDir, setSessionDir] = React.useState('');
       const [dshSession, setDshSession] = React.useState('');
@@ -228,11 +233,16 @@ function SessionBindingEditor({ sessions, agents, workspaces, onSave }) {
           ),
         ),
         React.createElement('div', { className: 'qqa-field' },
+          React.createElement('label', null, '模型'),
+          React.createElement('select', { className: 'qqa-select', value: model, onChange: (e) => setModel(e.target.value) },
+            React.createElement('option', { value: '' }, '跟随全局'),
+            ...(models || []).map((m) => React.createElement('option', { key: m.value, value: m.value }, m.label))),
+        ),
+        React.createElement('div', { className: 'qqa-field' },
           React.createElement('label', null, '工作区'),
           React.createElement('select', { className: 'qqa-select', value: workspace, onChange: (e) => setWorkspace(e.target.value) },
             React.createElement('option', { value: '' }, '跟随全局'),
-            ...workspaces.map((w) => React.createElement('option', { key: w.id, value: w.path }, w.label)),
-          ),
+            ...workspaces.map((w) => React.createElement('option', { key: w.id, value: w.path }, w.label))),
         ),
         React.createElement('div', { className: 'qqa-field' },
           React.createElement('label', null, '会话目录'),
@@ -246,7 +256,7 @@ function SessionBindingEditor({ sessions, agents, workspaces, onSave }) {
           onClick: async () => {
             setSaving(true);
             try {
-              await onSave({ chat_key: chatKey, agent_preset: agent, workspace_dir: workspace, session_dir: sessionDir, dsh_session_id: dshSession });
+              await onSave({ chat_key: chatKey, agent_preset: agent, model_provider: model.split(':')[0] || '', model_name: model.split(':').slice(1).join(':'), workspace_dir: workspace, session_dir: sessionDir, dsh_session_id: dshSession });
               setSaving(false);
             } catch (e) { setSaving(false); alert(e.message || String(e)); }
           } }, saving ? '保存中…' : '保存会话绑定'),
@@ -257,43 +267,15 @@ function RulesSection() {
       React.useEffect(() => {
         arExec('config_get').then((cfg) => {
           const e = (cfg && cfg.config && cfg.config.engine) || {};
-          setValues({
-            private_auto: !!e.private_auto, group_mode: e.group_mode || 'mention',
-            group_keywords: (e.group_keywords || []).join(','), context_n: e.context_n || 12,
-            per_min: (e.rate_limit && e.rate_limit.per_session_per_min) || 10,
-            daily: (e.rate_limit && e.rate_limit.daily_per_session) || 300,
-            sensitive: (e.sensitive_words || []).join(','),
-          });
+          setValues({ private_auto: !!e.private_auto, group_mode: e.group_mode || 'mention' });
         }).catch(() => {});
       }, []);
-      const field = (key, label, node) => React.createElement('div', { className: 'qqa-field', key },
-        React.createElement('label', null, label), node);
+      const field = (key, label, node) => React.createElement('div', { className: 'qqa-field', key }, React.createElement('label', null, label), node);
       return React.createElement('div', { className: 'qqa-section' },
         React.createElement('h4', null, '回复规则'),
-        field('private', '私聊全自动', React.createElement('input', { type: 'checkbox', checked: values.private_auto, onChange: (e) => setValues((v) => ({ ...v, private_auto: e.target.checked })) })),
-        field('mode', '群聊模式', React.createElement('select', { className: 'qqa-select', value: values.group_mode, onChange: (e) => setValues((v) => ({ ...v, group_mode: e.target.value })) },
-          React.createElement('option', { value: 'mention' }, '@本人'),
-          React.createElement('option', { value: 'keyword' }, '关键词'),
-          React.createElement('option', { value: 'all' }, '全部'),
-          React.createElement('option', { value: 'off' }, '关闭'))),
-        field('kw', '群聊关键词', React.createElement('input', { type: 'text', className: 'qqa-select', value: values.group_keywords, onChange: (e) => setValues((v) => ({ ...v, group_keywords: e.target.value })) })),
-        field('ctx', '上下文条数', React.createElement('input', { type: 'number', className: 'qqa-select', value: values.context_n, onChange: (e) => setValues((v) => ({ ...v, context_n: Number(e.target.value) })) })),
-        field('min', '每分钟上限', React.createElement('input', { type: 'number', className: 'qqa-select', value: values.per_min, onChange: (e) => setValues((v) => ({ ...v, per_min: Number(e.target.value) })) })),
-        field('day', '每日上限', React.createElement('input', { type: 'number', className: 'qqa-select', value: values.daily, onChange: (e) => setValues((v) => ({ ...v, daily: Number(e.target.value) })) })),
-        field('sens', '敏感词', React.createElement('input', { type: 'text', className: 'qqa-select', value: values.sensitive, onChange: (e) => setValues((v) => ({ ...v, sensitive: e.target.value })) })),
-        React.createElement('button', { className: 'qqa-btn-primary', onClick: async () => {
-          try {
-            await arExec('config_set', { batch: {
-              'engine.private_auto': values.private_auto,
-              'engine.group_mode': values.group_mode,
-              'engine.group_keywords': values.group_keywords.split(',').map((s) => s.trim()).filter(Boolean),
-              'engine.context_n': values.context_n,
-              'engine.rate_limit.per_session_per_min': values.per_min,
-              'engine.rate_limit.daily_per_session': values.daily,
-              'engine.sensitive_words': values.sensitive.split(',').map((s) => s.trim()).filter(Boolean),
-            } });
-          } catch (e) { alert(e.message || String(e)); }
-        } }, '保存规则'),
+        field('private', '私聊触发', React.createElement('select', { className: 'qqa-select', value: values.private_auto ? 'on' : 'off', onChange: (e) => setValues((v) => ({ ...v, private_auto: e.target.value === 'on' })) }, React.createElement('option', { value: 'on' }, '自动回复全部私聊'), React.createElement('option', { value: 'off' }, '关闭私聊自动回复'))),
+        field('mode', '群聊触发', React.createElement('select', { className: 'qqa-select', value: values.group_mode, onChange: (e) => setValues((v) => ({ ...v, group_mode: e.target.value })) }, React.createElement('option', { value: 'mention' }, '被 @ 时回复'), React.createElement('option', { value: 'keyword' }, '关键词命中时回复'), React.createElement('option', { value: 'all' }, '全部消息回复'), React.createElement('option', { value: 'off' }, '关闭群聊自动回复'))),
+        React.createElement('button', { className: 'qqa-btn-primary', onClick: async () => { try { await arExec('config_set', { batch: { 'engine.private_auto': values.private_auto, 'engine.group_mode': values.group_mode } }); } catch (e) { alert(e.message || String(e)); } } }, '保存规则'),
       );
     }
     function ChatSection({ sessions, logs }) {
@@ -409,21 +391,8 @@ function RulesSection() {
         ),
 // 回复规则
         React.createElement(RulesSection, null),
-        // 今日统计
-        React.createElement('h4', null, '今日统计'),
-        React.createElement('div', { className: 'qqa-grid' },
-          React.createElement('div', { className: 'qqa-kv' }, React.createElement('span', null, '收到'), React.createElement('b', null, (status && status.stats) ? status.stats.in : 0)),
-          React.createElement('div', { className: 'qqa-kv' }, React.createElement('span', null, '发出'), React.createElement('b', null, (status && status.stats) ? status.stats.out : 0)),
-          React.createElement('div', { className: 'qqa-kv' }, React.createElement('span', null, 'AI 回复'), React.createElement('b', null, (status && status.stats) ? status.stats.answered : 0)),
-          React.createElement('div', { className: 'qqa-kv' }, React.createElement('span', null, '拦截/跳过'), React.createElement('b', null, (status && status.stats) ? status.stats.skipped : 0)),
-        ),
-        // 最近回复
-        React.createElement('h4', null, '最近回复'),
         React.createElement(ChatSection, { sessions, logs }),
-        // 会话
-        React.createElement('h4', null, '会话'),
-        renderSessions(sessions),
-        React.createElement(SessionBindingEditor, { sessions, agents: catalog.agents, workspaces: catalog.workspaces, onSave: onSaveSessionBinding }),
+        React.createElement(SessionBindingEditor, { sessions, agents: catalog.agents, workspaces: catalog.workspaces, models: catalog.models, onSave: onSaveSessionBinding }),
       );
     }
 
