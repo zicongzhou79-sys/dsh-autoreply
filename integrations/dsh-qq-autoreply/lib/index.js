@@ -10,7 +10,7 @@
  */
 
 export const name = 'dsh-qq-autoreply'
-export const inject = ['webServer', 'tools', 'systemPrompt', 'sessions', 'agents', 'agentPresets', 'workspaceRegistry']
+export const inject = ['webServer', 'tools', 'systemPrompt', 'sessions', 'agents', 'agentPresets', 'workspaceRegistry', 'attachments']
 
 const DEFAULT_URL = process.env.AUTOREPLY_URL || 'http://127.0.0.1:8001'
 const AUTOREPLY_KEY = process.env.AUTOREPLY_TOKEN || '' // Bearer token if AutoReply requires one (empty = open)
@@ -24,6 +24,7 @@ const resolveCwd = (workspaceId) => String(workspaceId || process.cwd() || '').t
 import { request as httpRequest } from 'node:http'
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
+import { admitEncodedImages } from '@deepseek-ai/dsh-attachment'
 
 
 function makeMessage(input) {
@@ -233,6 +234,23 @@ async function attachSessionToWorkspace(ctx, session) {
   }
 }
 
+async function toAgentContent(ctx, content) {
+  const textParts = content.filter((part) => part && part.type === 'text')
+  const imageParts = content.filter((part) => part && part.type === 'image_url')
+  if (!imageParts.length) return content
+  if (!ctx.attachments) throw new Error('DSH attachments 服务未挂载，无法读取图片')
+  const encoded = imageParts.map((part) => {
+    const match = String(part.image_url.url).match(/^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/=]+)$/)
+    if (!match) throw new Error('图片必须是受支持格式的 base64 Data URL')
+    return { mediaType: match[1], data: match[2] }
+  })
+  const refs = await admitEncodedImages(ctx.attachments, encoded)
+  return [
+    ...textParts,
+    ...refs.map((attachment) => ({ type: 'image', attachment })),
+  ]
+}
+
 async function runSessionTurn(ctx, body) {
   const sessionId = String(body.session_id || '')
   const text = String(body.text || '')
@@ -271,7 +289,8 @@ async function runSessionTurn(ctx, body) {
     agent = handle.agent
   }
   await attachSessionToWorkspace(ctx, agent.session)
-  agent.followup(makeMessage({ role: 'user', content: messageContent, source: { kind: 'user' } }))
+  const agentContent = await toAgentContent(ctx, messageContent)
+  agent.followup(makeMessage({ role: 'user', content: agentContent, source: { kind: 'user' } }))
   await agent.whenIdle()
   const messages = agent.session.deriveMessages()
   const last = [...messages].reverse().find((message) => message.role === 'assistant')
