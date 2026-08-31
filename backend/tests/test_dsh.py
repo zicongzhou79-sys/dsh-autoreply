@@ -16,15 +16,12 @@ from app.store import db
 
 
 class FakeDSH:
-    def __init__(self, online=True, tool_result="增强信息", fail_tools=(), fail_chat=False):
+    def __init__(self, online=True, fail_chat=False):
         self.online = online
-        self.tool_result = tool_result
-        self.fail_tools = set(fail_tools)
         self.fail_chat = fail_chat
         self.probed = 0
-        self.called = []
-        self.chat_calls = []
-        self.cfg = DshCfg(enabled=True, reply_tools=["web_search"])
+        self.chats = []
+        self.cfg = DshCfg(enabled=True, reply_tools=[])
 
     @property
     def enabled(self):
@@ -37,14 +34,16 @@ class FakeDSH:
         self.probed += 1
         return self.online
 
-    async def call_tool(self, name, args=None):
-        self.called.append(name)
-        if name in self.fail_tools:
-            raise DSHUnavailable("工具不可用")
-        return self.tool_result
+    async def create_session(self, chat_key, session_id="", **kwargs):
+        return "session-test"
 
-    async def chat(self, messages, provider, model, temperature, max_tokens):
-        self.chat_calls.append({"messages": messages, "provider": provider, "model": model})
+    async def session_chat(self, session_id, chat_key, text, provider, model, agent_preset,
+                           workspace_id, temperature, max_tokens):
+        self.chats.append({
+            "session_id": session_id, "chat_key": chat_key, "text": text,
+            "provider": provider, "model": model, "agent_preset": agent_preset,
+            "workspace_id": workspace_id,
+        })
         if not self.cfg.enabled or self.fail_chat:
             raise DSHUnavailable("DSH generation failed")
         return "回复完成"
@@ -211,24 +210,13 @@ async def test_session_failure_does_not_send():
 
 
 @pytest.mark.asyncio
-async def test_engine_uses_dsh_for_tools_and_generation():
-    dsh = FakeDSH(tool_result="据检索：今天天气晴")
+async def test_engine_uses_dsh_session_for_generation():
+    dsh = FakeDSH()
     svc, gw = make_service(dsh)
     await svc.handle(make_msg("今天天气怎么样"))
-    assert dsh.called == ["web_search"]
-    assert len(dsh.chat_calls) == 1
-    assert dsh.chat_calls[0]["provider"] == "test-provider"
-    assert "据检索" in str(dsh.chat_calls[0]["messages"])
-    assert len(gw.sent) == 1
-
-
-@pytest.mark.asyncio
-async def test_tool_failure_skips_enrichment_but_generation_continues():
-    dsh = FakeDSH(fail_tools=["web_search"])
-    svc, gw = make_service(dsh)
-    await svc.handle(make_msg("随便聊聊"))
-    assert len(dsh.chat_calls) == 1
-    assert "增强信息" not in str(dsh.chat_calls[0]["messages"])
+    assert len(dsh.chats) == 1
+    assert dsh.chats[0]["provider"] == "test-provider"
+    assert dsh.chats[0]["text"] == "今天天气怎么样"
     assert len(gw.sent) == 1
 
 
@@ -248,8 +236,7 @@ async def test_engine_disabled_no_dsh_calls_or_reply():
     dsh = FakeDSH()
     svc, gw = make_service(dsh, enabled=False)
     await svc.handle(make_msg("你好"))
-    assert not dsh.called
-    assert len(dsh.chat_calls) == 1
+    assert len(dsh.chats) == 1
     assert not gw.sent
     assert db.list_reply_logs()[0]["decision"] == "failed"
 

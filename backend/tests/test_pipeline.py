@@ -20,7 +20,7 @@ class FakeDSH:
     def __init__(self, reply="收到:在吗", fail=False):
         self.cfg = AppConfig().engine.dsh
         self.cfg.enabled = True
-        self.called = []
+        self.chats = []
         self.reply = reply
         self.fail = fail
 
@@ -31,11 +31,16 @@ class FakeDSH:
     async def close(self):
         pass
 
-    async def call_tool(self, name, args=None):
-        return None
+    async def create_session(self, chat_key, session_id="", **kwargs):
+        return "session-test"
 
-    async def chat(self, messages, provider, model, temperature, max_tokens):
-        self.called.append({"messages": messages, "provider": provider, "model": model})
+    async def session_chat(self, session_id, chat_key, text, provider, model, agent_preset,
+                           workspace_id, temperature, max_tokens):
+        self.chats.append({
+            "session_id": session_id, "chat_key": chat_key, "text": text,
+            "provider": provider, "model": model, "agent_preset": agent_preset,
+            "workspace_id": workspace_id,
+        })
         if self.fail:
             raise DSHUnavailable("DSH generation failed")
         return self.reply
@@ -93,11 +98,10 @@ async def test_private_auto_reply_pipeline_uses_dsh():
     assert len(gw.sent) == 1
     assert gw.sent[0][0] == "friend:10001"
     assert "在吗" in gw.sent[0][1]
-    assert len(dsh.called) == 1
-    assert dsh.called[0]["provider"] == "test-provider"
-    assert dsh.called[0]["model"] == "test-model"
-    roles = [m["role"] for m in dsh.called[0]["messages"]]
-    assert roles[0] == "user"
+    assert len(dsh.chats) == 1
+    assert dsh.chats[0]["provider"] == "test-provider"
+    assert dsh.chats[0]["model"] == "test-model"
+    assert dsh.chats[0]["text"] == "在吗"
 
     msgs = db.recent_messages("friend:10001")
     assert [m["direction"] for m in msgs] == ["in", "ai"]
@@ -112,7 +116,7 @@ async def test_group_no_mention_skipped():
     await svc.handle(make_msg("大家好", chat_type="group", at_self=False))
     assert not gw.sent
     assert db.list_reply_logs()[0]["reason"] == "no_mention"
-    assert not dsh.called
+    assert not dsh.chats
 
 
 @pytest.mark.asyncio
@@ -126,7 +130,7 @@ async def test_own_message_only_enters_context():
     assert not gw.sent
     assert not db.list_reply_logs()
     assert len(db.recent_messages("friend:10001")) == 1
-    assert not dsh.called
+    assert not dsh.chats
 
 
 @pytest.mark.asyncio
@@ -138,7 +142,7 @@ async def test_sensitive_input_blocked():
     await svc.handle(make_msg("你说脏话吗"))
     assert not gw.sent
     assert db.list_reply_logs()[0]["decision"] == "blocked"
-    assert not dsh.called
+    assert not dsh.chats
 
 
 @pytest.mark.asyncio
@@ -165,4 +169,4 @@ async def test_rate_limit_skips():
     assert logs[0]["decision"] == "skipped"
     assert logs[0]["reason"] == "rate_limited"
     assert logs[1]["decision"] == "answered"
-    assert len(dsh.called) == 1
+    assert len(dsh.chats) == 1

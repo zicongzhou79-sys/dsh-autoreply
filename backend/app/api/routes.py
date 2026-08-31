@@ -180,9 +180,18 @@ async def api_test_llm(st: dict = Depends(get_app_state)) -> dict:
     service.refresh_config()
     cfg = service.cfg
     try:
-        reply = await service.dsh.chat(
-            [{"role": "user", "content": "ping"}],
-            cfg.llm.provider, cfg.llm.model, 0, 5,
+        session_id = await service.dsh.create_session(
+            "test_llm",
+            agent_preset=cfg.engine.dsh.agent_preset,
+            provider=cfg.llm.provider,
+            model=cfg.llm.model,
+            workspace_id=cfg.engine.workspace_dir,
+        )
+        reply = await service.dsh.session_chat(
+            session_id, "test_llm", "ping",
+            cfg.llm.provider, cfg.llm.model,
+            cfg.engine.dsh.agent_preset, cfg.engine.workspace_dir,
+            0, 5,
         )
         return {"ok": True, "model": cfg.llm.model, "reply": reply[:50]}
     except Exception as e:

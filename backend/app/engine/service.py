@@ -183,12 +183,11 @@ class ReplyService:
 
 
         start = time.time()
-        dsh_used = False
         try:
             if not sess:
                 sess = db.get_session(msg.chat_key)
             dsh_session_id = (sess or {}).get("dsh_session_id", "")
-            if not dsh_session_id and hasattr(self.dsh, "create_session"):
+            if not dsh_session_id:
                 dsh_session_id = await self.dsh.create_session(
                     msg.chat_key,
                     agent_preset=(sess or {}).get("agent_preset") or self.cfg.engine.dsh.agent_preset,
@@ -199,29 +198,14 @@ class ReplyService:
                 if dsh_session_id:
                     db.update_session_binding(msg.chat_key, dsh_session_id=dsh_session_id)
                     sess = db.get_session(msg.chat_key)
-            if hasattr(self.dsh, "session_chat") and dsh_session_id:
-                reply = await self.dsh.session_chat(
-                    dsh_session_id, msg.chat_key, msg.text,
-                    (sess or {}).get("model_provider") or self.cfg.llm.provider,
-                    (sess or {}).get("model_name") or self.cfg.llm.model,
-                    (sess or {}).get("agent_preset") or self.cfg.engine.dsh.agent_preset,
-                    (sess or {}).get("workspace_dir") or self.cfg.engine.workspace_dir,
-                    self.cfg.llm.temperature, self.cfg.llm.max_tokens,
-                )
-            else:
-                # Compatibility for test doubles and older DSH hosts only.
-                dsh_context: list[str] = []
-                if self.dsh.enabled and self.dsh.cfg.reply_tools:
-                    dsh_used = await self._gather_dsh_context(msg.text, dsh_context)
-                content = msg.text
-                if dsh_context:
-                    content += "\n\n" + "\n".join(dsh_context)
-                reply = await self.dsh.chat(
-                    [{"role": "user", "content": content}],
-                    (sess or {}).get("model_provider") or self.cfg.llm.provider,
-                    (sess or {}).get("model_name") or self.cfg.llm.model,
-                    self.cfg.llm.temperature, self.cfg.llm.max_tokens,
-                )
+            reply = await self.dsh.session_chat(
+                dsh_session_id, msg.chat_key, msg.text,
+                (sess or {}).get("model_provider") or self.cfg.llm.provider,
+                (sess or {}).get("model_name") or self.cfg.llm.model,
+                (sess or {}).get("agent_preset") or self.cfg.engine.dsh.agent_preset,
+                (sess or {}).get("workspace_dir") or self.cfg.engine.workspace_dir,
+                self.cfg.llm.temperature, self.cfg.llm.max_tokens,
+            )
             duration_ms = (time.time() - start) * 1000
         except DSHUnavailable as e:
             duration_ms = (time.time() - start) * 1000
@@ -264,27 +248,8 @@ class ReplyService:
             "sender_id": self_id or "0", "sender_name": "AI", "text": reply,
             "ts": time.time(),
         })
-        log.info("[answered] %s: %r -> %r (%.0fms%s)", msg.chat_key,
-                 msg.text[:40], reply[:40], duration_ms,
-                 ", dsh_tools" if dsh_used else "")
-
-    # ---------- DSH 工具增强 ----------
-
-    async def _gather_dsh_context(self, text: str, out: list[str]) -> bool:
-        """按白名单调用 DSH 工具收集增强信息；任一成功即返回 True。
-
-        DSH 工具增强是可选的：工具失败只跳过增强信息；模型生成仍必须通过 DSH 完成。
-        """
-        used = False
-        for tool_name in list(self.dsh.cfg.reply_tools or []):
-            try:
-                result = await self.dsh.call_tool(tool_name, {"query": text})
-                if result:
-                    out.append(f"{tool_name}: {str(result)[:600]}")
-                    used = True
-            except Exception as e:
-                log.info("DSH 工具 %s 调用失败（跳过增强）: %s", tool_name, str(e)[:120])
-        return used
+        log.info("[answered] %s: %r -> %r (%.0fms)", msg.chat_key,
+                 msg.text[:40], reply[:40], duration_ms)
 
     # ---------- 工具 ----------
 
