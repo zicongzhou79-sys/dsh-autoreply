@@ -49,6 +49,39 @@ class FakeDSH:
             raise DSHUnavailable("DSH generation failed")
         return "回复完成"
 
+class FakeSessionDSH:
+    """DSH client compatible with the primary session_chat path."""
+    def __init__(self, reply="", fail=False):
+        self.cfg = DshCfg(enabled=True, reply_tools=[])
+        self.reply = reply
+        self.fail = fail
+        self.created = []
+        self.chats = []
+
+    @property
+    def enabled(self):
+        return self.cfg.enabled
+
+    async def close(self):
+        pass
+
+    async def probe(self):
+        return True
+
+    async def create_session(self, chat_key, session_id="", **kwargs):
+        self.created.append({"chat_key": chat_key, **kwargs})
+        return "session-test"
+
+    async def session_chat(self, session_id, chat_key, text, provider, model, agent_preset,
+                           workspace_id, temperature, max_tokens):
+        self.chats.append({
+            "session_id": session_id, "chat_key": chat_key, "text": text,
+            "provider": provider, "model": model, "agent_preset": agent_preset,
+            "workspace_id": workspace_id,
+        })
+        if self.fail:
+            raise DSHUnavailable("DSH Session chat failed")
+        return self.reply
 
 class FakeGateway:
     is_online = True
@@ -153,6 +186,29 @@ async def test_client_session_chat_contract(monkeypatch):
 
     monkeypatch.setattr(httpx, "AsyncClient", lambda timeout=None, trust_env=None: FakeClient())
     assert await client.session_chat("s1", "friend:1", "hello", "p", "m", "agent", "/tmp/work", 0.7, 50) == "session reply"
+
+@pytest.mark.asyncio
+async def test_session_empty_reply_does_not_send():
+    dsh = FakeSessionDSH(reply="")
+    svc, gw = make_service(dsh)
+    await svc.handle(make_msg("你好"))
+    assert not gw.sent
+    log = db.list_reply_logs()[0]
+    assert log["decision"] == "skipped"
+    assert log["reason"] == "empty_output"
+    assert dsh.created and dsh.chats
+
+
+@pytest.mark.asyncio
+async def test_session_failure_does_not_send():
+    dsh = FakeSessionDSH(fail=True)
+    svc, gw = make_service(dsh)
+    await svc.handle(make_msg("你好"))
+    assert not gw.sent
+    log = db.list_reply_logs()[0]
+    assert log["decision"] == "failed"
+    assert "DSH Session chat failed" in log["reason"]
+
 
 @pytest.mark.asyncio
 async def test_engine_uses_dsh_for_tools_and_generation():
