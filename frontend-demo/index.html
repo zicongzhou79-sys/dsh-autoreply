@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QQ 自动回复 · 前端 Demo</title>
+  <style>
+    :root { color-scheme: dark; --bg:#0d1117; --panel:#151b24; --panel-2:#1b2430; --line:#2a3543; --text:#edf2f7; --muted:#8e9aaa; --green:#45d483; --amber:#eab65b; --red:#f16d77; --blue:#71a7ff; --cyan:#62d4dc; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-width:320px; background:var(--bg); color:var(--text); font:13px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    button, input, select, textarea { font:inherit; }
+    button { cursor:pointer; }
+    .app { display:grid; grid-template-columns:230px minmax(0,1fr); min-height:100vh; }
+    .sidebar { border-right:1px solid var(--line); background:#10161e; padding:22px 14px; display:flex; flex-direction:column; gap:24px; }
+    .brand { display:flex; gap:11px; align-items:center; padding:0 8px; }
+    .brand-mark { width:34px; height:34px; display:grid; place-items:center; border-radius:10px; background:#e7f0ff; color:#162339; font-weight:800; font-size:15px; }
+    .brand strong { display:block; font-size:14px; letter-spacing:.1px; }
+    .brand small { color:var(--muted); font-size:11px; }
+    .nav { display:grid; gap:4px; }
+    .nav button { display:flex; align-items:center; gap:10px; color:var(--muted); background:transparent; border:0; border-radius:7px; padding:10px 11px; text-align:left; }
+    .nav button:hover, .nav button.active { background:#202a38; color:var(--text); }
+    .nav-icon { width:18px; text-align:center; color:var(--blue); font-size:15px; }
+    .sidebar-foot { margin-top:auto; border-top:1px solid var(--line); padding:15px 8px 0; color:var(--muted); font-size:11px; }
+    .main { min-width:0; }
+    .topbar { height:72px; display:flex; align-items:center; justify-content:space-between; gap:18px; border-bottom:1px solid var(--line); padding:0 30px; }
+    .eyebrow { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.12em; }
+    h1 { margin:2px 0 0; font-size:21px; letter-spacing:0; }
+    .top-actions { display:flex; align-items:center; gap:9px; }
+    .status-pill { display:flex; align-items:center; gap:7px; color:#c9d4df; border:1px solid var(--line); border-radius:18px; padding:6px 11px; }
+    .dot { width:7px; height:7px; border-radius:50%; background:var(--red); display:inline-block; flex:none; }
+    .dot.on { background:var(--green); box-shadow:0 0 0 3px rgba(69,212,131,.12); }
+    .dot.warn { background:var(--amber); }
+    .icon-btn { width:32px; height:32px; display:grid; place-items:center; border:1px solid var(--line); border-radius:7px; color:var(--muted); background:transparent; }
+    .icon-btn:hover { color:var(--text); border-color:#52657b; background:var(--panel-2); }
+    .content { max-width:1260px; margin:0 auto; padding:28px 30px 42px; }
+    .overview { display:grid; grid-template-columns:1.55fr 1fr 1fr 1fr; gap:12px; margin-bottom:24px; }
+    .metric, .card { border:1px solid var(--line); background:var(--panel); border-radius:8px; }
+    .metric { padding:15px 16px; min-height:96px; }
+    .metric-label { color:var(--muted); font-size:12px; display:flex; justify-content:space-between; gap:8px; }
+    .metric-value { font-size:25px; font-weight:650; margin-top:8px; }
+    .metric-note { color:var(--muted); font-size:11px; margin-top:1px; }
+    .section-head { display:flex; align-items:center; justify-content:space-between; margin:24px 0 10px; }
+    .section-head h2 { margin:0; font-size:14px; }
+    .section-head span { color:var(--muted); font-size:11px; }
+    .grid-main { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(300px,.85fr); gap:14px; align-items:start; }
+    .card { padding:18px; }
+    .card-title { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:15px; }
+    .card-title h3 { margin:0; font-size:14px; }
+    .card-title span { color:var(--muted); font-size:11px; }
+    .state-list { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+    .state { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:11px 12px; border:1px solid var(--line); border-radius:7px; background:#121923; }
+    .state b { display:flex; align-items:center; gap:7px; color:#d8e2ec; font-size:12px; font-weight:500; }
+    .state em { color:var(--green); font-size:11px; font-style:normal; }
+    .state.off em { color:var(--red); }
+    .controls { display:flex; gap:8px; margin-top:15px; }
+    .btn { border:1px solid var(--line); border-radius:6px; color:var(--text); background:#202a38; padding:8px 12px; }
+    .btn:hover { border-color:#60758d; background:#283547; }
+    .btn.primary { color:#07150d; background:var(--green); border-color:var(--green); font-weight:650; }
+    .btn.primary:hover { background:#6be09a; }
+    .btn.danger { color:#ffd9dd; border-color:#6e353d; background:#321d23; }
+    .btn.small { padding:5px 9px; font-size:11px; }
+    .service-note { color:var(--muted); font-size:11px; margin-top:10px; min-height:17px; }
+    .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:13px 12px; }
+    .field { display:grid; gap:5px; }
+    .field.full { grid-column:1/-1; }
+    label { color:var(--muted); font-size:11px; }
+    input, select, textarea { width:100%; color:var(--text); background:#101720; border:1px solid var(--line); border-radius:6px; outline:0; padding:8px 9px; }
+    input:focus, select:focus, textarea:focus { border-color:var(--blue); box-shadow:0 0 0 2px rgba(113,167,255,.12); }
+    textarea { resize:vertical; min-height:72px; }
+    .toggle-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); margin:16px 0; }
+    .toggle-copy strong { display:block; font-size:12px; }
+    .toggle-copy small { color:var(--muted); font-size:11px; }
+    .switch { position:relative; width:40px; height:22px; flex:none; }
+    .switch input { opacity:0; width:0; height:0; }
+    .slider { position:absolute; inset:0; border-radius:20px; background:#344150; transition:.2s; }
+    .slider:before { content:""; position:absolute; width:16px; height:16px; left:3px; top:3px; border-radius:50%; background:#c1cad4; transition:.2s; }
+    .switch input:checked + .slider { background:var(--green); }
+    .switch input:checked + .slider:before { transform:translateX(18px); background:#102217; }
+    .feed { display:grid; gap:10px; max-height:330px; overflow:auto; }
+    .message { display:flex; gap:10px; align-items:flex-start; }
+    .avatar { width:29px; height:29px; display:grid; place-items:center; flex:none; border-radius:7px; color:#d5e2f2; background:#293a51; font-size:11px; font-weight:700; }
+    .message.ai .avatar { color:#082016; background:#72dfa0; }
+    .bubble-wrap { min-width:0; flex:1; }
+    .message-meta { color:var(--muted); font-size:11px; margin-bottom:3px; }
+    .bubble { display:inline-block; max-width:90%; padding:8px 10px; color:#dce6f0; background:#202a38; border-radius:4px 8px 8px 8px; }
+    .message.ai { flex-direction:row-reverse; text-align:right; }
+    .message.ai .bubble { color:#07170e; background:#b9f0c9; border-radius:8px 4px 8px 8px; text-align:left; }
+    .session-list, .log-list { display:grid; gap:5px; }
+    .session, .log { display:flex; align-items:center; gap:10px; padding:10px; border:1px solid transparent; border-radius:6px; cursor:pointer; }
+    .session:hover, .session.selected { background:#202a38; border-color:#334456; }
+    .session .avatar { width:30px; height:30px; border-radius:50%; background:#334863; }
+    .session-copy { min-width:0; flex:1; }
+    .session-copy strong { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:12px; }
+    .session-copy small { display:block; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:11px; }
+    .session-time { color:var(--muted); font-size:10px; align-self:flex-start; }
+    .badge { font-size:10px; padding:2px 6px; border-radius:4px; color:#a9d8ff; background:#183049; }
+    .log { cursor:default; border-bottom:1px solid var(--line); border-radius:0; padding:9px 2px; }
+    .log:last-child { border-bottom:0; }
+    .log .dot { margin-top:2px; }
+    .log-copy { min-width:0; flex:1; }
+    .log-copy strong { font-weight:500; font-size:12px; }
+    .log-copy small { display:block; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .log-time { color:var(--muted); font-size:10px; }
+    .bind { margin-top:14px; padding-top:14px; border-top:1px solid var(--line); }
+    .bind-head { color:var(--muted); font-size:11px; margin-bottom:9px; }
+    .empty { color:var(--muted); padding:24px 4px; text-align:center; }
+    .toast { position:fixed; right:22px; bottom:22px; padding:10px 14px; border:1px solid #3a7755; border-radius:7px; color:#d9ffe5; background:#12271b; opacity:0; transform:translateY(8px); pointer-events:none; transition:.22s; }
+    .toast.show { opacity:1; transform:translateY(0); }
+    @media (max-width:900px) { .app { grid-template-columns:64px minmax(0,1fr); } .sidebar { padding:18px 10px; } .brand { justify-content:center; padding:0; } .brand > div:last-child, .nav button span:last-child, .sidebar-foot { display:none; } .nav button { justify-content:center; padding:10px; } .grid-main { grid-template-columns:1fr; } .overview { grid-template-columns:repeat(2,1fr); } }
+    @media (max-width:560px) { .topbar { height:auto; padding:16px; align-items:flex-start; } .top-actions { flex-wrap:wrap; justify-content:flex-end; } .content { padding:18px 14px 30px; } .overview { grid-template-columns:1fr 1fr; gap:8px; } .metric { min-height:80px; padding:12px; } .metric-value { font-size:21px; } .card { padding:14px; } .state-list, .form-grid { grid-template-columns:1fr; } .field.full { grid-column:auto; } }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">QQ</div><div><strong>QQ 自动回复</strong><small>DSH Plugin Demo</small></div></div>
+      <nav class="nav" aria-label="主导航">
+        <button class="active" data-scroll="overview"><span class="nav-icon">◈</span><span>总览</span></button>
+        <button data-scroll="conversation"><span class="nav-icon">◌</span><span>会话</span></button>
+        <button data-scroll="runtime"><span class="nav-icon">◇</span><span>DSH 运行时</span></button>
+        <button data-scroll="rules"><span class="nav-icon">≡</span><span>回复规则</span></button>
+      </nav>
+      <div class="sidebar-foot">前端演示模式<br>数据只保存在当前页面</div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <div><div class="eyebrow">DeepSeek Harness / QQ Channel</div><h1>自动回复控制台</h1></div>
+        <div class="top-actions"><div class="status-pill"><span class="dot on" id="topDot"></span><span id="topStatus">运行中</span></div><button class="icon-btn" id="refreshBtn" title="刷新模拟数据" aria-label="刷新模拟数据">↻</button></div>
+      </header>
+      <div class="content">
+        <section id="overview">
+          <div class="overview">
+            <div class="metric"><div class="metric-label">今日收到 <span class="dot on"></span></div><div class="metric-value" id="statIn">128</div><div class="metric-note">较昨日 +18%</div></div>
+            <div class="metric"><div class="metric-label">AI 回复</div><div class="metric-value" id="statAnswered">64</div><div class="metric-note">成功率 92.8%</div></div>
+            <div class="metric"><div class="metric-label">工具调用</div><div class="metric-value" id="statTools">37</div><div class="metric-note">DSH Agent 执行</div></div>
+            <div class="metric"><div class="metric-label">拦截 / 跳过</div><div class="metric-value" id="statSkipped">11</div><div class="metric-note">安全策略生效</div></div>
+          </div>
+          <div class="section-head"><h2>运行概况</h2><span>模拟数据 · 刚刚更新</span></div>
+          <div class="grid-main">
+            <section class="card">
+              <div class="card-title"><h3>服务状态</h3><span id="updatedAt">连接正常</span></div>
+              <div class="state-list">
+                <div class="state"><b><span class="dot on"></span>OneBot 连接</b><em>在线</em></div>
+                <div class="state"><b><span class="dot on"></span>QQ 登录</b><em>已登录</em></div>
+                <div class="state"><b><span class="dot on"></span>DSH Runtime</b><em>在线</em></div>
+                <div class="state"><b><span class="dot on"></span>Agent Session</b><em id="sessionState">已就绪</em></div>
+              </div>
+              <div class="controls"><button class="btn primary" id="serviceBtn">停止自动回复</button><button class="btn" id="restartBtn">重启服务</button></div>
+              <div class="service-note" id="serviceNote">NapCat、OneBot 和 DSH Agent 均已连接。</div>
+            </section>
+            <section class="card" id="runtime">
+              <div class="card-title"><h3>DSH 运行配置</h3><span>当前生效</span></div>
+              <div class="form-grid">
+                <div class="field full"><label for="model">模型服务 / 模型</label><select id="model"><option>DeepSeek / deepseek-chat</option><option>DeepSeek / deepseek-reasoner</option><option>OpenAI Compatible / gpt-5</option></select></div>
+                <div class="field full"><label for="agent">Agent 预设</label><select id="agent"><option>QQ 本人助手 · qq-personal-assistant</option><option>简洁回复 · concise-reply</option><option>工作助理 · work-assistant</option></select></div>
+                <div class="field full"><label for="workspace">工作区</label><select id="workspace"><option>默认工作区 · ~/workspace/default</option><option>私人记忆 · ~/workspace/personal</option><option>工作项目 · ~/workspace/work</option></select></div>
+              </div>
+              <div class="service-note">模型、工具权限、上下文和记忆由 DSH 管理。</div>
+            </section>
+          </div>
+        </section>
+        <div class="grid-main" id="conversation">
+          <section class="card">
+            <div class="card-title"><h3>最近会话</h3><span>选择会话查看上下文</span></div>
+            <div class="session-list" id="sessionList"></div>
+          </section>
+          <section class="card" id="rules">
+            <div class="card-title"><h3>回复规则</h3><span>本地安全策略</span></div>
+            <label class="toggle-row"><span class="toggle-copy"><strong>私聊自动回复</strong><small>收到好友消息后交给 DSH Agent</small></span><span class="switch"><input type="checkbox" checked data-setting="private"><span class="slider"></span></span></label>
+            <div class="form-grid">
+              <div class="field"><label for="groupMode">群聊触发</label><select id="groupMode"><option>@本人时回复</option><option>命中关键词时回复</option><option>所有消息回复</option><option>关闭群聊</option></select></div>
+              <div class="field"><label for="rate">每分钟上限</label><input id="rate" type="number" value="10" min="0"></div>
+              <div class="field full"><label for="keywords">群聊关键词</label><input id="keywords" value="帮我,提醒,在吗" placeholder="用逗号分隔"></div>
+              <div class="field full"><label for="sensitive">敏感词</label><input id="sensitive" value="密码,验证码" placeholder="用逗号分隔"></div>
+            </div>
+            <button class="btn primary" id="saveRules" style="margin-top:15px">保存规则</button>
+          </section>
+        </div>
+        <div class="grid-main">
+          <section class="card">
+            <div class="card-title"><h3 id="conversationTitle">会话消息 · 小明</h3><span class="badge" id="conversationBadge">friend:10001</span></div>
+            <div class="feed" id="feed"></div>
+            <div class="bind"><div class="bind-head">会话级绑定</div><div class="form-grid"><div class="field"><label>Agent preset</label><select><option>跟随全局</option><option>简洁回复</option></select></div><div class="field"><label>DSH Session ID</label><input value="sess_qqa_10001" /></div></div><button class="btn small" id="saveBinding" style="margin-top:10px">保存会话绑定</button></div>
+          </section>
+          <section class="card">
+            <div class="card-title"><h3>回复日志</h3><span>最近 5 条</span></div>
+            <div class="log-list" id="logList"></div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+  <script>
+    const state = { running:true, selected:'friend:10001', stats:{in:128, answered:64, tools:37, skipped:11} };
+    const sessions = [
+      { key:'friend:10001', name:'小明', type:'好友', preview:'晚上一起吃饭吗？', time:'刚刚', initials:'明', messages:[['in','小明','晚上一起吃饭吗？','20:31'],['ai','AI','可以呀，几点？','20:31'],['in','小明','七点半老地方见。','20:32'],['ai','AI','好，七点半见。','20:32']] },
+      { key:'group:876543', name:'产品讨论群', type:'群聊', preview:'@本人 这周的方案看了吗', time:'2 分钟前', initials:'产', messages:[['in','小王','@本人 这周的方案看了吗','20:29'],['ai','AI','看过了，我晚点把建议整理出来。','20:29']] },
+      { key:'friend:20002', name:'妈妈', type:'好友', preview:'记得明天早点回家', time:'18 分钟前', initials:'妈', messages:[['in','妈妈','记得明天早点回家','20:13'],['ai','AI','知道啦，明天见。','20:14']] },
+      { key:'group:112233', name:'摄影小组', type:'群聊', preview:'今天有人去拍日落吗', time:'1 小时前', initials:'摄', messages:[['in','阿杰','今天有人去拍日落吗','19:22']] }
+    ];
+    const logs = [
+      ['answered','小明 · Agent 完成回复','可以呀，几点？','刚刚','on'],
+      ['answered','产品讨论群 · 工具调用 2 次','我晚点把建议整理出来。','2 分钟前','on'],
+      ['skipped','摄影小组 · no_mention','未提及本人，跳过处理','1 小时前','warn'],
+      ['blocked','妈妈 · sensitive:验证码','命中出站安全策略','2 小时前',''],
+      ['failed','小明 · agent_timeout','DSH Session 响应超时','昨天','']
+    ];
+    const $ = (id) => document.getElementById(id);
+    function toast(text) { const el=$('toast'); el.textContent=text; el.classList.add('show'); clearTimeout(window.toastTimer); window.toastTimer=setTimeout(()=>el.classList.remove('show'),2200); }
+    function renderSessions() { $('sessionList').innerHTML=sessions.map(s=>`<div class="session ${s.key===state.selected?'selected':''}" data-key="${s.key}"><div class="avatar">${s.initials}</div><div class="session-copy"><strong>${s.name}<span class="badge" style="margin-left:6px">${s.type}</span></strong><small>${s.preview}</small></div><span class="session-time">${s.time}</span></div>`).join(''); document.querySelectorAll('.session').forEach(el=>el.onclick=()=>{state.selected=el.dataset.key; renderSessions(); renderFeed();}); }
+    function renderFeed() { const s=sessions.find(x=>x.key===state.selected)||sessions[0]; $('conversationTitle').textContent='会话消息 · '+s.name; $('conversationBadge').textContent=s.key; $('feed').innerHTML=s.messages.map(m=>`<div class="message ${m[0]}"><div class="avatar">${m[1]==='AI'?'AI':s.initials}</div><div class="bubble-wrap"><div class="message-meta">${m[1]} · ${m[3]}</div><div class="bubble">${m[2]}</div></div></div>`).join(''); $('sessionState').textContent='已就绪'; }
+    function renderLogs() { $('logList').innerHTML=logs.map(l=>`<div class="log"><span class="dot ${l[4]}"></span><div class="log-copy"><strong>${l[1]}</strong><small>${l[2]}</small></div><span class="log-time">${l[3]}</span></div>`).join(''); }
+    function updateService() { $('serviceBtn').textContent=state.running?'停止自动回复':'启动自动回复'; $('serviceBtn').className=state.running?'btn danger':'btn primary'; $('topStatus').textContent=state.running?'运行中':'已停止'; $('topDot').className=state.running?'dot on':'dot'; $('serviceNote').textContent=state.running?'NapCat、OneBot 和 DSH Agent 均已连接。':'自动回复已停止，NapCat 登录态保持。'; }
+    document.querySelectorAll('.nav button').forEach(btn=>btn.onclick=()=>{ document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active')); btn.classList.add('active'); $(btn.dataset.scroll).scrollIntoView({behavior:'smooth',block:'start'}); });
+    $('serviceBtn').onclick=()=>{state.running=!state.running; updateService(); toast(state.running?'自动回复已启动':'自动回复已停止');};
+    $('restartBtn').onclick=()=>{state.running=false; updateService(); $('serviceNote').textContent='正在重启 DSH Agent Session…'; toast('模拟重启中…'); setTimeout(()=>{state.running=true; updateService(); toast('服务已重启');},850);};
+    $('refreshBtn').onclick=()=>{ $('updatedAt').textContent='刚刚更新'; toast('模拟数据已刷新'); };
+    $('saveRules').onclick=()=>toast('回复规则已保存（模拟）');
+    $('saveBinding').onclick=()=>toast('会话绑定已保存（模拟）');
+    ['model','agent','workspace','groupMode'].forEach(id=>$(id).onchange=()=>toast('配置已更新（模拟）'));
+    renderSessions(); renderFeed(); renderLogs(); updateService();
+  </script>
+</body>
+</html>
