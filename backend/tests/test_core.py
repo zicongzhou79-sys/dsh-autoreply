@@ -108,13 +108,7 @@ def test_decision_group_mention():
     assert ok
 
 
-def test_decision_autonomous_delegates_to_ai():
-    cfg = AppConfig().engine
-    cfg.group_mode = "autonomous"
-    ok, reason = decide(cfg, make_msg("group", at_self=False))
-    assert ok and reason == ""
-
-
+def test_decision_group_off():
     cfg = AppConfig().engine
     cfg.group_mode = "off"
     ok, r = decide(cfg, make_msg("group", at_self=True))

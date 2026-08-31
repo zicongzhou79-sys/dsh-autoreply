@@ -163,7 +163,7 @@ POST /api/config  {"batch":{
 | llm | provider/model/temperature/max_tokens | DSH runtime 模型路由和生成参数 |
 | engine.master_switch | - | 总开关，关闭则只记录不回复 |
 | engine.private_auto | - | 私聊全自动 |
-| engine.group_mode | mention/keyword/all/autonomous/off | 群聊触发策略；autonomous 由 DSH Agent 结合上下文自主判断是否回复（默认 @本人 才回） |
+| engine.group_mode | mention/keyword/all/off | 群聊触发策略（默认 @本人 才回） |
 | engine.group_keywords | - | keyword 模式触发词 |
 | engine.whitelist / blacklist | friends/groups | 空=全部；白名单非空=仅名单 |
 | engine.rate_limit | per_session_per_min | 每会话每分钟 AI 回复上限 |
