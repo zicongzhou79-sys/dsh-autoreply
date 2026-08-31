@@ -14,10 +14,6 @@ export const inject = ['webServer', 'tools', 'systemPrompt', 'llm', 'sessions']
 
 const DEFAULT_URL = process.env.AUTOREPLY_URL || 'http://127.0.0.1:8001'
 const AUTOREPLY_KEY = process.env.AUTOREPLY_TOKEN || '' // Bearer token if AutoReply requires one (empty = open)
-// DSH host owns turn history; AutoReply never sends its SQLite history to the model.
-const SESSION_TURNS = new Map()
-
-
 
 // ---- tiny JSON client for AutoReply REST ----
 // 用 node:http 直连：DSH 进程环境带 ALL_PROXY=socks://127.0.0.1:7897（代理常未运行），
@@ -243,22 +239,19 @@ async function runSessionTurn(ctx, body) {
   const text = String(body.text || '')
   const provider = String(body.provider || '')
   const model = String(body.model || '')
-  if (!sessionId || !text || !provider || !model) {
-    throw new Error('session_id/text/provider/model required')
-  }
-  const turns = SESSION_TURNS.get(sessionId) || []
-  const messages = [...turns, { role: 'user', content: text }].map((m) => createMessage({
-    role: m.role,
-    content: [{ type: 'text', text: String(m.content || '') }],
-    source: m.role === 'assistant' ? { kind: 'model', provider, model } : { kind: m.role === 'system' ? 'plugin' : 'user', ...(m.role === 'system' ? { plugin: 'dsh-qq-autoreply' } : {}) },
-  }))
+  if (!sessionId || !text || !provider || !model) throw new Error('session_id/text/provider/model required')
+  const session = ctx.sessions.get(sessionId)
+  if (!session) throw new Error(`DSH Session 不存在: ${sessionId}`)
+  const userMessage = createMessage({ role: 'user', content: [{ type: 'text', text }], source: { kind: 'user' } })
+  const userEvent = session.append('user/message', userMessage, { surfaceOp: 'append', sourceEventSeqs: [] })
   let content = ''
-  for await (const chunk of ctx.llm.stream({ provider, model, messages,
+  for await (const chunk of ctx.llm.stream({ provider, model, messages: session.deriveMessages(),
     temperature: body.temperature, maxTokens: body.max_tokens })) {
     if (chunk.type === 'text-delta') content += chunk.text || ''
   }
-  turns.push({ role: 'user', content: text }, { role: 'assistant', content })
-  SESSION_TURNS.set(sessionId, turns.slice(-40))
+  const assistantMessage = createMessage({ role: 'assistant', content: [{ type: 'text', text: content }], source: { kind: 'model', provider, model } })
+  session.append('assistant/message', { message: assistantMessage }, { surfaceOp: 'append', sourceEventSeqs: [userEvent.seq] })
+  await ctx.sessions.flush(session)
   return { provider, model, session_id: sessionId, content }
 }
 

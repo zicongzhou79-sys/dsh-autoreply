@@ -70,8 +70,8 @@ window.__ModuleLoader__.load({
   color: var(--dsw-alias-label-secondary, #8a8f98); border-radius: 6px; padding: 2px 8px;
   font-size: 11px; cursor: pointer; white-space: nowrap; }
 .qqa-bar .btn:hover { color: var(--dsw-alias-label-primary, #e6edf3); border-color: var(--dsw-alias-brand-primary, #58a6ff); }
-.qqa-panel { box-sizing: border-box; position: fixed; left: 72px; bottom: 16px; width: min(560px, calc(100vw - 96px));
-  max-height: 82vh; overflow-y: auto; z-index: 999; font-size: 13px;
+.qqa-panel { box-sizing: border-box; position: fixed; left: 72px; top: 58px; bottom: auto; width: min(560px, calc(100vw - 96px));
+  max-height: calc(100vh - 74px); overflow-y: auto; z-index: 999; font-size: 13px;
   color: var(--dsw-alias-label-primary, #e6edf3);
   background: var(--dsw-alias-bg-overlay, rgba(17,20,25,.98));
   border: 1px solid var(--dsw-alias-border-l2, rgba(128,128,128,.3)); border-radius: 16px;
