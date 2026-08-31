@@ -108,17 +108,18 @@ bash scripts/start.sh --bg     # 后台运行，日志看 logs/backend.log
 
 ---
 
-## 5b. DeepSeek Harness 互通（可选功能）
+## 5b. DeepSeek Harness 互通
 
-本项目可与 **DeepSeek Harness (DSH)** 双向打通，用 DSH 会话直接管理 QQ 自动回复，
-并让 AutoReply 回复引擎调用 DSH 工具增强回复。
+本项目与 **DeepSeek Harness (DSH)** 深度集成：DSH 是 QQ 自动回复的唯一智能运行时。
+AutoReply 负责 QQ 接入、消息归档、触发规则、安全检查和受控发送；DSH Agent 负责模型、
+工具、Agent preset、会话上下文和记忆。
 
 ### 双向能力
 
 | 方向 | 能力 |
 |---|---|
-| **DSH → AutoReply** | DSH 会话中可用工具：`qq_autoreply_status` / `config_get` / `config_set`（改 LLM/人设/规则，立即生效）/ `sessions` / `messages` / `logs` / `test_llm` |
-| **AutoReply → DSH** | 回复引擎生成前可调 DSH 工具（如 `reply_knowledge` 状态摘要）注入上下文，再交给 LLM 生成 |
+| **DSH → AutoReply** | DSH 会话中可用工具：`qq_autoreply_status` / `config_get` / `config_set` / `sessions` / `messages` / `logs` / `test_llm` / `session_binding` / `service_control` |
+| **AutoReply → DSH** | AutoReply 将当前 QQ 消息交给绑定的 DSH Session/Agent；DSH Agent 通过 `ctx.agents` 执行，Session 事件持久化 |
 
 ### 插件安装
 
@@ -135,8 +136,7 @@ dsh plugin --profile web add ./integrations/dsh-qq-autoreply
 # 在 WebUI 配置页或直接：
 POST /api/config  {"batch":{
   "engine.dsh.enabled": true,
-  "engine.dsh.base_url": "http://127.0.0.1:3081",   # DSH 后端端口（3080 是 web 前端）
-  "engine.dsh.reply_tools": ["reply_knowledge"]      # 回复增强工具白名单
+  "engine.dsh.base_url": "http://127.0.0.1:3081"   # DSH 后端端口（3080 是 web 前端）
 }}
 ```
 
@@ -148,6 +148,8 @@ POST /api/config  {"batch":{
   去除了 fetch 代理导致的 localhost 挂起
 - `/dsh-qq/health` 轻量探测（不递归调 AutoReply），避免 status↔health 探测环路延迟
 - AutoReply 侧 `DSHClient.probe()` 带 5s 缓存，不拖慢面板轮询
+- Agent 创建/恢复时总是提供 `cwd`，未绑定 workspace 时回退到 DSH 启动目录，
+  避免 Agent preset 中的 `{{cwd}}` 变量无值
 - DSH 不可达时模型生成记录失败并跳过发送；仅 DSH 工具增强失败时跳过增强信息，不影响后续模型生成。
 
 ---
