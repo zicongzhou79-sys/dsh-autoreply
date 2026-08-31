@@ -213,6 +213,7 @@ window.__ModuleLoader__.load({
 
 function SessionBindingEditor({ sessions, agents, workspaces, models, onSave }) {
       const [chatKey, setChatKey] = React.useState('');
+      const [agent, setAgent] = React.useState('');
       const [model, setModel] = React.useState('');
       const [workspace, setWorkspace] = React.useState('');
       const [sessionDir, setSessionDir] = React.useState('');
