@@ -104,15 +104,32 @@ class ReplyService:
 
 
 
+    async def _resolve_peer_name(self, msg: ParsedMessage) -> str:
+        """私聊返回对方昵称；群聊优先返回真实群名，失败时回退到发送者昵称。"""
+        if msg.chat_type != "group" or not msg.group_id:
+            return msg.sender_name
+        get_info = getattr(self.gateway, "get_group_info", None)
+        if get_info is None:
+            return msg.sender_name
+        try:
+            info = await get_info(msg.group_id)
+            name = (info or {}).get("group_name") or ""
+            if name.strip():
+                return name.strip()
+        except Exception:
+            pass
+        return msg.sender_name
+
     async def handle(self, msg: ParsedMessage) -> None:
         self.refresh_config()
+        peer_name = await self._resolve_peer_name(msg)
         # 统一落库（in 与自身消息都入库做上下文）
         msg_id = db.add_message(
             msg.chat_key, "in", msg.sender_id, msg.sender_name,
             msg.text, msg.raw,
         )
         workspace_dir, session_dir = self._session_paths(msg.chat_key)
-        db.upsert_session(msg.chat_key, msg.chat_type, msg.sender_name,
+        db.upsert_session(msg.chat_key, msg.chat_type, peer_name,
                           workspace_dir=workspace_dir, session_dir=session_dir)
         for attachment in msg.attachments:
             db.add_attachment(msg_id, msg.chat_key, asdict(attachment))
@@ -240,7 +257,7 @@ class ReplyService:
         out_id = db.add_message(msg.chat_key, direction, self_id or "0", "AI",
                                 reply, ts=time.time())
         workspace_dir, session_dir = self._session_paths(msg.chat_key)
-        db.upsert_session(msg.chat_key, msg.chat_type, msg.sender_name,
+        db.upsert_session(msg.chat_key, msg.chat_type, peer_name,
                           workspace_dir=workspace_dir, session_dir=session_dir)
         db.add_reply_log(msg_id, msg.chat_key, "answered", "", reply, duration_ms)
         await self.hub.broadcast("message", {
