@@ -124,6 +124,7 @@ window.__ModuleLoader__.load({
   color: #f85149; }
 .qqa-btn-primary.on:hover:not(:disabled) { background: rgba(248,81,73,.22); }
 .qqa-btn-primary:disabled { opacity: .55; cursor: default; }
+.qqa-btn-compact { width: auto; padding: 6px 16px; }
 .qqa-chat { display:flex; flex-direction:column; gap:6px; max-height:260px; overflow:auto; margin-top:8px; padding:8px; border:1px solid var(--dsw-alias-border-l1,rgba(128,128,128,.2)); border-radius:8px; }
 .qqa-chat-msg { display:flex; gap:8px; align-items:baseline; padding:5px 7px; background:var(--dsw-alias-bg-layer-1,rgba(0,0,0,.04)); border-radius:5px; }
 .qqa-chat-msg b { flex:none; font-size:11px; }
@@ -254,23 +255,6 @@ function SessionBindingEditor({ sessions, agents, workspaces, models, onSave, on
       const list = sessions || [];
       return React.createElement('div', { className: 'qqa-section' },
         React.createElement('h4', null, '会话绑定'),
-        React.createElement('div', { className: 'qqa-field' },
-          React.createElement('label', null, '已绑定会话 · 管理启用状态与删除'),
-          React.createElement('div', { className: 'qqa-bind-list' },
-            ...list.filter((s) => s.dsh_session_id).map((s) => React.createElement('div', { className: 'qqa-bind-row', key: s.chat_key },
-              React.createElement('div', { className: 'qqa-bind-name' },
-                React.createElement('strong', null, s.peer_name || s.chat_key),
-                React.createElement('small', null, (s.chat_type === 'group' ? '群' : '友') + ' · ' + (s.dsh_session_id || '未绑定'))),
-              React.createElement('span', { className: 'qqa-bind-tag' }, s.agent_preset || '默认'),
-              React.createElement('div', { className: 'qqa-bind-actions' },
-                React.createElement('label', { className: 'qqa-toggle' },
-                  React.createElement('input', { type: 'checkbox', checked: !!s.auto_on, onChange: (e) => onToggleAuto && onToggleAuto(s.chat_key, e.target.checked) }),
-                  React.createElement('span', { className: 'tknob' })),
-                React.createElement('button', { className: 'qqa-mini', onClick: () => onDeleteBinding && onDeleteBinding(s.chat_key) }, '删除'),
-              ),
-            )),
-          ),
-        ),
         React.createElement('div', { className: 'qqa-binding-top' },
           React.createElement('div', { className: 'qqa-field' },
             React.createElement('label', null, '工作区'),
@@ -296,7 +280,7 @@ function SessionBindingEditor({ sessions, agents, workspaces, models, onSave, on
               ...(agents || []).map((a) => React.createElement('option', { key: a.id, value: a.id }, a.label))),
           ),
         ),
-        React.createElement('button', { className: 'qqa-btn-primary', disabled: !chatKey || saving,
+        React.createElement('button', { className: 'qqa-btn-primary qqa-btn-compact', disabled: !chatKey || saving,
           onClick: async () => {
             setSaving(true);
             try {
@@ -304,6 +288,23 @@ function SessionBindingEditor({ sessions, agents, workspaces, models, onSave, on
               setSaving(false);
             } catch (e) { setSaving(false); alert(e.message || String(e)); }
           } }, saving ? '保存中…' : '绑定会话'),
+        React.createElement('div', { className: 'qqa-field' },
+          React.createElement('label', null, '已绑定会话 · 管理启用状态与删除'),
+          React.createElement('div', { className: 'qqa-bind-list' },
+            ...list.filter((s) => s.dsh_session_id).map((s) => React.createElement('div', { className: 'qqa-bind-row', key: s.chat_key },
+              React.createElement('div', { className: 'qqa-bind-name' },
+                React.createElement('strong', null, s.peer_name || s.chat_key),
+                React.createElement('small', null, (s.chat_type === 'group' ? '群' : '友') + ' · ' + (s.dsh_session_id || '未绑定'))),
+              React.createElement('span', { className: 'qqa-bind-tag' }, s.agent_preset || '默认'),
+              React.createElement('div', { className: 'qqa-bind-actions' },
+                React.createElement('label', { className: 'qqa-toggle' },
+                  React.createElement('input', { type: 'checkbox', checked: !!s.auto_on, onChange: (e) => onToggleAuto && onToggleAuto(s.chat_key, e.target.checked) }),
+                  React.createElement('span', { className: 'tknob' })),
+                React.createElement('button', { className: 'qqa-mini', onClick: () => onDeleteBinding && onDeleteBinding(s.chat_key) }, '删除'),
+              ),
+            )),
+          ),
+        ),
       );
     }
 
