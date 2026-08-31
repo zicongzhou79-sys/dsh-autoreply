@@ -154,5 +154,15 @@ def test_clean_reply():
     assert "" == svc._clean_reply("   \n  ")
 
 
+def test_clean_reply_downgrades_markdown_for_qq():
+    svc = ReplyService.__new__(ReplyService)
+    out = svc._clean_reply(
+        "# 标题\n**重点**、*说明*、`代码`\n"
+        "> 引用\n- 第一项\n[文档](https://example.com)"
+    )
+    assert out == "标题\n重点、说明、代码\n引用\n- 第一项\n文档（https://example.com）"
+
+
 if __name__ == "__main__":
+
     sys.exit(pytest.main([__file__, "-v"]))

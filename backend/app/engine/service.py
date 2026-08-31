@@ -296,13 +296,26 @@ class ReplyService:
 
     @staticmethod
     def _clean_reply(text: str) -> str:
-        """输出清洗：去 markdown 代码围栏、截断长度、压缩空白。"""
-        t = text.strip()
+        """把 Markdown 降级为 QQ 可读的纯文本。"""
+        t = text.replace("\r\n", "\n").replace("\r", "\n").strip()
         # 去 ```lang ... ``` 围栏
         t = re.sub(r"```[a-zA-Z0-9_]*\s*", "", t)
         t = re.sub(r"```", "", t)
-        # 去行首引用标记（AI 常用 > 引用原文）
+        # 链接保留文字和地址，图片 Markdown 降级为图片描述和地址。
+        t = re.sub(r"!\[([^]]*)\]\(([^)]+)\)", r"\1（\2）", t)
+        t = re.sub(r"\[([^]]+)\]\(([^)]+)\)", r"\1（\2）", t)
+        # 去行首标题、引用和无序列表标记。
+        t = re.sub(r"(?m)^\s*#{1,6}\s+", "", t)
         t = re.sub(r"(?m)^>\s?", "", t)
+        t = re.sub(r"(?m)^\s*[-*+]\s+", "- ", t)
+        # 分隔线和表格分隔行没有信息，表格列改为空格分隔。
+        t = re.sub(r"(?m)^\s*([-*_])(?:\s*\1){2,}\s*$", "", t)
+        t = re.sub(r"(?m)^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$", "", t)
+        t = re.sub(r"\s*\|\s*", "  ", t)
+        # 去 Markdown 内联装饰符，保留其包裹的正文。
+        t = re.sub(r"(?<!\\)(\*\*|__|~~|`)", "", t)
+        t = re.sub(r"(?<!\\)(?<!\*)\*(?!\*)|(?<!_)_(?!_)", "", t)
+        t = re.sub(r"\\([\\`*_[\]{}()#+.!|~>-])", r"\1", t)
         t = re.sub(r"\n{3,}", "\n\n", t).strip()
         max_len = 1500
         if len(t) > max_len:
