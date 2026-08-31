@@ -164,7 +164,7 @@ window.__ModuleLoader__.load({
   .qqa-chat-item:hover, .qqa-chat-item.active { background: rgba(88,166,255,.12); }
   .qqa-chat-item strong { display: block; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .qqa-chat-item small { display: block; color: var(--dsw-alias-label-secondary,#8a8f98); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .qqa-messages { display: flex; flex-direction: column; gap: 8px; padding: 10px; background: #0d1218; overflow-y: auto; }
+  .qqa-messages { display: flex; flex-direction: column; gap: 8px; padding: 10px; background: #0d1218; overflow-y: auto; max-height: 360px; }
   .qqa-msg { display: flex; gap: 6px; align-items: flex-start; }
   .qqa-msg.ai { flex-direction: row-reverse; }
   .qqa-msg .qqa-avatar { width: 22px; height: 22px; flex: none; border-radius: 5px; background: #31465e; color: #dce6f0; font-size: 9px; display: grid; place-items: center; }
@@ -327,11 +327,14 @@ function RulesSection() {
       const list = sessions || [];
       const [chatKey, setChatKey] = React.useState('');
       const [messages, setMessages] = React.useState([]);
+      const [visibleCount, setVisibleCount] = React.useState(20);
       React.useEffect(() => { if (!chatKey && list[0]) setChatKey(list[0].chat_key); }, [chatKey, list]);
       React.useEffect(() => {
+        setVisibleCount(20);
         if (!chatKey) return;
-        arExec('messages', { chat_key: chatKey, limit: 80 }).then((d) => setMessages((d && d.messages) || [])).catch(() => setMessages([]));
+        arExec('messages', { chat_key: chatKey, limit: 100 }).then((d) => setMessages((d && d.messages) || [])).catch(() => setMessages([]));
       }, [chatKey]);
+      const shown = messages.slice(-visibleCount);
       const failures = (logs || []).filter((l) => l.chat_key === chatKey && l.decision === 'failed');
       return React.createElement('div', { className: 'qqa-section' },
         React.createElement('h4', null, '模拟聊天'),
@@ -342,7 +345,7 @@ function RulesSection() {
               React.createElement('small', null, (s.chat_type === 'group' ? '群聊' : '私聊') + ' · ' + (s.last_text || '…')))),
           ),
           React.createElement('div', { className: 'qqa-messages' },
-            ...(messages.length ? messages.map((m) => React.createElement('div', { key: m.id, className: 'qqa-msg' + (m.direction === 'ai' ? ' ai' : '') },
+            ...(shown.length ? shown.map((m) => React.createElement('div', { key: m.id, className: 'qqa-msg' + (m.direction === 'ai' ? ' ai' : '') },
               React.createElement('span', { className: 'qqa-avatar' }, (m.nick || (m.direction === 'ai' ? 'AI' : '友')).slice(0, 1)),
               React.createElement('div', null,
                 React.createElement('span', { className: 'qqa-meta' }, (m.nick || (m.direction === 'ai' ? 'AI' : '成员')) + ' · ' + fmtTime(m.ts)),
@@ -356,6 +359,7 @@ function RulesSection() {
                 React.createElement('div', { className: 'qqa-bubble' }, '回复失败：' + (l.reason || 'DSH Agent 暂时不可用') + '。未发送到 QQ。'),
               ),
             )),
+            visibleCount < messages.length ? React.createElement('button', { className: 'qqa-mini', style: { marginTop: 4 }, onClick: () => setVisibleCount((n) => Math.min(messages.length, n + 20)) }, '显示更多（' + visibleCount + '/' + messages.length + '）') : null,
           ),
         ),
       );
