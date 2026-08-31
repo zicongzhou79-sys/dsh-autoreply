@@ -142,30 +142,6 @@ class DSHClient:
             raise DSHUnavailable(f"DSH Session 调用异常: {e.__class__.__name__}: {e}")
 
 
-    async def chat(self, messages: list[dict], provider: str, model: str,
-                   temperature: float, max_tokens: int) -> str:
-        """通过 DSH host 模型运行时生成回复。"""
-        if not self.enabled:
-            raise DSHUnavailable("DSH 接入未启用")
-        try:
-            resp = await self._get_client().post(
-                f"{self.cfg.base_url.rstrip('/')}/dsh-qq/llm",
-                json={"provider": provider, "model": model, "messages": messages,
-                      "temperature": temperature, "max_tokens": max_tokens},
-            )
-            if resp.status_code != 200:
-                raise DSHUnavailable(f"DSH LLM HTTP {resp.status_code}: {resp.text[:200]}")
-            data = resp.json()
-            if data.get("ok") is False:
-                raise DSHUnavailable(data.get("error", "DSH LLM failed"))
-            return str((data.get("result") or {}).get("content", ""))
-        except DSHUnavailable:
-            raise
-        except Exception as e:
-            raise DSHUnavailable(f"DSH LLM 调用异常: {e.__class__.__name__}: {e}")
-
-
-
     async def get_persona(self) -> Optional[dict]:
         """从 DSH 插件读取人设（若配置了 persona_path）。失败返回 None。"""
         if not self.enabled:

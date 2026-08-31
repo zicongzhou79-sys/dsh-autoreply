@@ -31,8 +31,7 @@
 - `GET /dsh-qq/health`
 - `POST /dsh-qq/execute`，请求体为 `{ "tool": "status", "args": {} }`
 - `GET /dsh-qq/persona`（兼容读取接口）
-- `POST /dsh-qq/session`，支持 `list`、`get`、`create`、`chat`；`chat` 只接收当前消息和 DSH 资源引用，Session 上下文由 DSH host 持有
-- `POST /dsh-qq/llm`（旧 host 兼容接口，正式自动回复不使用）
+- `POST /dsh-qq/session`，支持 `list`、`get`、`create`、`chat`；`chat` 只接收当前消息和 DSH 资源引用，Session 上下文由 DSH Agent 持有
 
 ## DSH 原生 API
 

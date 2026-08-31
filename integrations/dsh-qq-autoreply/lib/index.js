@@ -5,12 +5,12 @@
  *   A) DSH session → AutoReply: registers model tools (qq_autoreply_*) that
  *      read/write AutoReply's REST API — status, config (DSH model / persona /
  *      engine rules), sessions, messages, reply logs, and a DSH model test-call.
- *   B) AutoReply → DSH: exposes /dsh-qq/health, /dsh-qq/execute and /dsh-qq/llm;
- *      DSH runtime is the only reply-generation path.
+ *   B) AutoReply → DSH: exposes /dsh-qq/health, /dsh-qq/execute and /dsh-qq/session;
+ *      DSH Agent 是唯一回复运行时。
  */
 
 export const name = 'dsh-qq-autoreply'
-export const inject = ['webServer', 'tools', 'systemPrompt', 'llm', 'sessions', 'agents', 'agentPresets']
+export const inject = ['webServer', 'tools', 'systemPrompt', 'sessions', 'agents', 'agentPresets']
 
 const DEFAULT_URL = process.env.AUTOREPLY_URL || 'http://127.0.0.1:8001'
 const AUTOREPLY_KEY = process.env.AUTOREPLY_TOKEN || '' // Bearer token if AutoReply requires one (empty = open)
@@ -221,23 +221,6 @@ async function handlePersona() {
     return { ok: false, error: String(e && e.message || e) }
   }
 }
-async function handleDshLlm(ctx, body) {
-  if (!ctx.llm) throw new Error('DSH llm 服务未挂载，请检查 profile 是否包含 LLM runtime')
-  const provider = String(body.provider || '')
-  const model = String(body.model || '')
-  if (!provider || !model || !Array.isArray(body.messages)) throw new Error('provider/model/messages required')
-  const messages = body.messages.map((m) => makeMessage({
-    role: m.role === 'assistant' ? 'assistant' : m.role === 'system' ? 'system' : 'user',
-    content: [{ type: 'text', text: String(m.content || '') }],
-    source: m.role === 'assistant' ? { kind: 'model', provider, model } : { kind: m.role === 'system' ? 'plugin' : 'user', ...(m.role === 'system' ? { plugin: 'dsh-qq-autoreply' } : {}) },
-  }))
-  let text = ''
-  for await (const chunk of ctx.llm.stream({ provider, model, messages,
-    temperature: body.temperature, maxTokens: body.max_tokens })) {
-    if (chunk.type === 'text-delta') text += chunk.text || ''
-  }
-  return { provider, model, content: text }
-}
 
 
 async function runSessionTurn(ctx, body) {
@@ -246,35 +229,22 @@ async function runSessionTurn(ctx, body) {
   const provider = String(body.provider || '')
   const model = String(body.model || '')
   if (!sessionId || !text || !provider || !model) throw new Error('session_id/text/provider/model required')
+  if (!ctx.agents) throw new Error('DSH agents 服务未挂载，请检查 profile 是否包含 Agent loop')
   const session = ctx.sessions.get(sessionId)
-  if (!session && !ctx.agents) throw new Error(`DSH Session 不存在: ${sessionId}`)
-  if (ctx.agents) {
-    let agent = ctx.agents.get(sessionId)
-    if (!agent) {
-      const setup = ctx.agentPresets ? async (agentCtx) => { await ctx.agentPresets.mount(agentCtx, body.agent_preset || undefined) } : undefined
-      const handle = session
-        ? await ctx.agents.resume({ resumeSessionId: sessionId, agentOptions: { provider, model, maxTokens: body.max_tokens }, setup })
-        : await ctx.agents.create({ sessionId, meta: { cwd: resolveCwd(body.workspace_id), agentPreset: body.agent_preset || undefined }, agentOptions: { provider, model, maxTokens: body.max_tokens }, setup })
-      agent = handle.agent
-    }
-    agent.followup(makeMessage({ role: 'user', content: [{ type: 'text', text }], source: { kind: 'user' } }))
-    await agent.whenIdle()
-    const messages = agent.session.deriveMessages()
-    const last = [...messages].reverse().find((message) => message.role === 'assistant')
-    if (!last) throw new Error('DSH Agent 未产生回复')
-    return { provider, model, session_id: sessionId, content: last.content.map((part) => part.type === 'text' ? part.text : '').join('') }
+  let agent = ctx.agents.get(sessionId)
+  if (!agent) {
+    const setup = ctx.agentPresets ? async (agentCtx) => { await ctx.agentPresets.mount(agentCtx, body.agent_preset || undefined) } : undefined
+    const handle = session
+      ? await ctx.agents.resume({ resumeSessionId: sessionId, agentOptions: { provider, model, maxTokens: body.max_tokens }, setup })
+      : await ctx.agents.create({ sessionId, meta: { cwd: resolveCwd(body.workspace_id), agentPreset: body.agent_preset || undefined }, agentOptions: { provider, model, maxTokens: body.max_tokens }, setup })
+    agent = handle.agent
   }
-  const userMessage = makeMessage({ role: 'user', content: [{ type: 'text', text }], source: { kind: 'user' } })
-  const userEvent = session.append('user/message', userMessage, { surfaceOp: 'append', sourceEventSeqs: [] })
-  let content = ''
-  for await (const chunk of ctx.llm.stream({ provider, model, messages: session.deriveMessages(),
-    temperature: body.temperature, maxTokens: body.max_tokens })) {
-    if (chunk.type === 'text-delta') content += chunk.text || ''
-  }
-  const assistantMessage = makeMessage({ role: 'assistant', content: [{ type: 'text', text: content }], source: { kind: 'model', provider, model } })
-  session.append('assistant/message', { message: assistantMessage }, { surfaceOp: 'append', sourceEventSeqs: [userEvent.seq] })
-  await ctx.sessions.flush(session)
-  return { provider, model, session_id: sessionId, content }
+  agent.followup(makeMessage({ role: 'user', content: [{ type: 'text', text }], source: { kind: 'user' } }))
+  await agent.whenIdle()
+  const messages = agent.session.deriveMessages()
+  const last = [...messages].reverse().find((message) => message.role === 'assistant')
+  if (!last) throw new Error('DSH Agent 未产生回复')
+  return { provider, model, session_id: sessionId, content: last.content.map((part) => part.type === 'text' ? part.text : '').join('') }
 }
 
 async function handleDshSession(ctx, body) {
@@ -282,14 +252,10 @@ async function handleDshSession(ctx, body) {
   const action = body.action || 'list'
   if (action === 'list') return { sessions: ctx.sessions.list().map((s) => ({ id: s.id, cwd: s.header.cwd, createdAt: s.header.createdAt })) }
   if (action === 'create') {
-    if (ctx.agents) {
-      const setup = ctx.agentPresets ? async (agentCtx) => { await ctx.agentPresets.mount(agentCtx, body.agent_preset || undefined) } : undefined
-      const handle = await ctx.agents.create({ sessionId: body.id || `qqa-${Date.now()}`, meta: { cwd: resolveCwd(body.workspace_id), agentPreset: body.agent_preset || undefined }, agentOptions: { provider: body.provider || undefined, model: body.model || undefined, maxTokens: body.max_tokens }, setup })
-      const session = handle.agent.session
-      return { session: { id: session.id, cwd: session.header.cwd, createdAt: session.header.createdAt } }
-    }
-    const session = ctx.sessions.create(body.id || undefined, { meta: { source: 'qq-autoreply', chatKey: body.chat_key || '' } })
-    await ctx.sessions.flush(session)
+    if (!ctx.agents) throw new Error('DSH agents 服务未挂载，请检查 profile 是否包含 Agent loop')
+    const setup = ctx.agentPresets ? async (agentCtx) => { await ctx.agentPresets.mount(agentCtx, body.agent_preset || undefined) } : undefined
+    const handle = await ctx.agents.create({ sessionId: body.id || `qqa-${Date.now()}`, meta: { cwd: resolveCwd(body.workspace_id), agentPreset: body.agent_preset || undefined }, agentOptions: { provider: body.provider || undefined, model: body.model || undefined, maxTokens: body.max_tokens }, setup })
+    const session = handle.agent.session
     return { session: { id: session.id, cwd: session.header.cwd, createdAt: session.header.createdAt } }
   }
   if (action === 'chat') {
@@ -461,13 +427,13 @@ export function apply(ctx) {
           send(200, await handleExecute(body))
         } else if (url.pathname === '/dsh-qq/persona') {
           send(200, await handlePersona())
-        } else if (url.pathname === '/dsh-qq/llm' || url.pathname === '/dsh-qq/session') {
+        } else if (url.pathname === '/dsh-qq/session') {
           if (req.method !== 'POST') return send(405, { ok: false, error: 'POST only' })
           const chunks = []
           for await (const c of req) chunks.push(c)
           let body = {}
           try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}') } catch { return send(400, { ok: false, error: 'invalid JSON' }) }
-          const result = url.pathname.endsWith('/llm') ? await handleDshLlm(ctx, body) : await handleDshSession(ctx, body)
+          const result = await handleDshSession(ctx, body)
           send(200, { ok: true, result })
         } else {
           send(404, { ok: false, error: 'not found' })

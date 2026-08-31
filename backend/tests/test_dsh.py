@@ -136,7 +136,9 @@ async def test_disabled_client_raises():
     with pytest.raises(DSHUnavailable):
         await client.call_tool("web_search", {"query": "x"})
     with pytest.raises(DSHUnavailable):
-        await client.chat([], "p", "m", 0, 5)
+        await client.create_session("friend:1")
+    with pytest.raises(DSHUnavailable):
+        await client.session_chat("s", "friend:1", "hi", "p", "m")
 
 
 @pytest.mark.asyncio
