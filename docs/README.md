@@ -10,3 +10,4 @@
 - [运维手册](operations.md)：启动、停止、日志、备份和故障处理。
 - [安全说明](security.md)：token、工作区、消息和附件安全边界。
 - [变更记录](changelog.md)：版本和行为变化。
+- [重构状态与验收清单](refactor-status.md)：当前重构完成度、验证证据和剩余人工项。
