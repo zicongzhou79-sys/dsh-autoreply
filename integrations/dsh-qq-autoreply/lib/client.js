@@ -253,10 +253,7 @@ function SessionBindingEditor({ sessions, agents, workspaces, onSave }) {
       );
     }
 function RulesSection() {
-      const [values, setValues] = React.useState({
-        private_auto: true, group_mode: 'mention', group_keywords: '', context_n: 12,
-        per_min: 10, daily: 300, sensitive: '',
-      });
+      const [values, setValues] = React.useState({ private_auto: true, group_mode: 'mention' });
       React.useEffect(() => {
         arExec('config_get').then((cfg) => {
           const e = (cfg && cfg.config && cfg.config.engine) || {};
@@ -299,6 +296,27 @@ function RulesSection() {
         } }, '保存规则'),
       );
     }
+    function ChatSection({ sessions, logs }) {
+      const list = sessions || [];
+      const [chatKey, setChatKey] = React.useState('');
+      const [messages, setMessages] = React.useState([]);
+      React.useEffect(() => { if (!chatKey && list[0]) setChatKey(list[0].chat_key); }, [chatKey, list]);
+      React.useEffect(() => {
+        if (!chatKey) return;
+        arExec('messages', { chat_key: chatKey, limit: 80 }).then((d) => setMessages((d && d.messages) || [])).catch(() => setMessages([]));
+      }, [chatKey]);
+      const failures = (logs || []).filter((l) => l.chat_key === chatKey && l.decision === 'failed');
+      return React.createElement('div', { className: 'qqa-section' },
+        React.createElement('h4', null, '模拟聊天'),
+        React.createElement('select', { className: 'qqa-select', value: chatKey, onChange: (e) => setChatKey(e.target.value) },
+          React.createElement('option', { value: '' }, '选择私聊或群聊会话'),
+          ...list.map((s) => React.createElement('option', { key: s.chat_key, value: s.chat_key }, `${s.peer_name || s.chat_key} · ${s.chat_type === 'group' ? '群聊' : '私聊'}`))),
+        React.createElement('div', { className: 'qqa-chat' },
+          ...(messages.length ? messages.map((m) => React.createElement('div', { className: 'qqa-chat-msg', key: m.id }, React.createElement('b', null, m.nick || (m.direction === 'ai' ? 'AI' : '成员')), React.createElement('span', null, m.text || '（附件）'))) : [React.createElement('div', { className: 'qqa-note', key: 'empty' }, '暂无消息')]),
+          ...failures.slice(0, 3).map((l) => React.createElement('div', { className: 'qqa-chat-error', key: `failure-${l.id}` }, `回复失败：${l.reason || 'DSH Agent 暂时不可用'}。未发送到 QQ。`))),
+      );
+    }
+
     function DetailPanel({ status, logs, sessions, onRefresh, onToggleMaster,
       serviceBusy, serviceNote, allServicesOn, onToggleService, onRestartService, catalog,
       onSelectModel, onSelectAgent, onSelectWorkspace, onOpenLogin, onSaveSessionBinding, onClose }) {
@@ -401,7 +419,7 @@ function RulesSection() {
         ),
         // 最近回复
         React.createElement('h4', null, '最近回复'),
-        renderLogs(logs),
+        React.createElement(ChatSection, { sessions, logs }),
         // 会话
         React.createElement('h4', null, '会话'),
         renderSessions(sessions),
