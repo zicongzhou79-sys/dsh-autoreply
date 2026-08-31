@@ -146,6 +146,9 @@ window.__ModuleLoader__.load({
   .qqa-brand-icon { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 6px; background: var(--dsw-alias-label-primary,#e6edf3); color: #111; font-size: 10px; font-weight: 700; }
   .qqa-topbar-status { display: flex; align-items: center; gap: 5px; color: var(--dsw-alias-label-secondary,#8a8f98); font-size: 11px; white-space: nowrap; }
   .qqa-topbar .spacer { flex: 1; }
+  .qqa-top-btn { border: 1px solid var(--dsw-alias-border-l1,rgba(128,128,128,.2)); border-radius: 6px; background: transparent; color: var(--dsw-alias-label-secondary,#8a8f98); padding: 5px 9px; font-size: 11px; cursor: pointer; white-space: nowrap; }
+  .qqa-top-btn:hover { border-color: var(--dsw-alias-brand-primary,#58a6ff); color: var(--dsw-alias-label-primary,#e6edf3); }
+  .qqa-top-close { font-size: 16px; padding: 1px 8px; line-height: 18px; }
   .qqa-login-actions { display: flex; gap: 6px; margin-top: 6px; }
   .qqa-binding-top { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .qqa-rule-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -389,10 +392,8 @@ function RulesSection() {
             React.createElement('span', { className: 'dot ' + (allOk ? 'ok' : 'bad') }),
             React.createElement('span', null, allOk ? '运行中' : '异常')),
           React.createElement('div', { className: 'spacer' }),
-          React.createElement('button', { type: 'button', className: 'qqa-icon-button', title: '刷新', 'aria-label': '刷新', onClick: onRefresh },
-            React.createElement(Primitives.IconRefreshOutline16, { size: 16 })),
-          React.createElement('button', { type: 'button', className: 'qqa-icon-button', title: '关闭', 'aria-label': '关闭', onClick: onClose },
-            React.createElement(Primitives.IconCloseOutline16, { size: 16 })),
+          React.createElement('button', { type: 'button', className: 'qqa-top-btn', title: '刷新', onClick: onRefresh }, '↻ 刷新'),
+          React.createElement('button', { type: 'button', className: 'qqa-top-btn qqa-top-close', title: '关闭', onClick: onClose }, '×'),
         ),
         React.createElement('h4', null, '运行状态'),
         React.createElement('div', { className: 'qqa-grid' },
