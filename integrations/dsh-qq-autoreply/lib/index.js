@@ -15,6 +15,9 @@ export const inject = ['webServer', 'tools', 'systemPrompt', 'llm', 'sessions', 
 const DEFAULT_URL = process.env.AUTOREPLY_URL || 'http://127.0.0.1:8001'
 const AUTOREPLY_KEY = process.env.AUTOREPLY_TOKEN || '' // Bearer token if AutoReply requires one (empty = open)
 
+// DSH Agent 的 cwd 必须始终存在；未绑定 workspace 时回退到 DSH 启动目录，
+// 避免 preset 中的 {{cwd}} 变量无值导致装配错误。
+const resolveCwd = (workspaceId) => String(workspaceId || process.cwd() || '').trim()
 // ---- tiny JSON client for AutoReply REST ----
 // 用 node:http 直连：DSH 进程环境带 ALL_PROXY=socks://127.0.0.1:7897（代理常未运行），
 // 原生 fetch 会继承该代理导致 localhost 调用挂起；node:http 不读代理环境，直连可靠。
@@ -251,7 +254,7 @@ async function runSessionTurn(ctx, body) {
       const setup = ctx.agentPresets ? async (agentCtx) => { await ctx.agentPresets.mount(agentCtx, body.agent_preset || undefined) } : undefined
       const handle = session
         ? await ctx.agents.resume({ resumeSessionId: sessionId, agentOptions: { provider, model, maxTokens: body.max_tokens }, setup })
-        : await ctx.agents.create({ sessionId, meta: { cwd: body.workspace_id || undefined, agentPreset: body.agent_preset || undefined }, agentOptions: { provider, model, maxTokens: body.max_tokens }, setup })
+        : await ctx.agents.create({ sessionId, meta: { cwd: resolveCwd(body.workspace_id), agentPreset: body.agent_preset || undefined }, agentOptions: { provider, model, maxTokens: body.max_tokens }, setup })
       agent = handle.agent
     }
     agent.followup(makeMessage({ role: 'user', content: [{ type: 'text', text }], source: { kind: 'user' } }))
@@ -281,7 +284,7 @@ async function handleDshSession(ctx, body) {
   if (action === 'create') {
     if (ctx.agents) {
       const setup = ctx.agentPresets ? async (agentCtx) => { await ctx.agentPresets.mount(agentCtx, body.agent_preset || undefined) } : undefined
-      const handle = await ctx.agents.create({ sessionId: body.id || `qqa-${Date.now()}`, meta: { cwd: body.workspace_id || undefined, agentPreset: body.agent_preset || undefined }, agentOptions: { provider: body.provider || undefined, model: body.model || undefined, maxTokens: body.max_tokens }, setup })
+      const handle = await ctx.agents.create({ sessionId: body.id || `qqa-${Date.now()}`, meta: { cwd: resolveCwd(body.workspace_id), agentPreset: body.agent_preset || undefined }, agentOptions: { provider: body.provider || undefined, model: body.model || undefined, maxTokens: body.max_tokens }, setup })
       const session = handle.agent.session
       return { session: { id: session.id, cwd: session.header.cwd, createdAt: session.header.createdAt } }
     }
