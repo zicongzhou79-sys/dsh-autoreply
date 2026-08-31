@@ -175,8 +175,9 @@ async def test_client_session_chat_contract(monkeypatch):
             return {"ok": True, "result": {"content": "session reply"}}
 
     class FakeClient:
-        async def post(self, url, json=None):
+        async def post(self, url, json=None, timeout=None):
             assert url == "http://127.0.0.1:1/dsh-qq/session"
+            assert timeout is not None and timeout >= 120
             assert json == {
                 "action": "chat", "session_id": "s1", "chat_key": "friend:1",
                 "text": "hello", "provider": "p", "model": "m",

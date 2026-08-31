@@ -103,6 +103,7 @@ class DSHClient:
                 json={"action": "create", "id": session_id or None, "chat_key": chat_key,
                       "agent_preset": agent_preset, "provider": provider, "model": model,
                       "workspace_id": workspace_id},
+                timeout=max(self.cfg.timeout_s, 60.0),
             )
             if resp.status_code != 200:
                 raise DSHUnavailable(f"DSH Session HTTP {resp.status_code}: {resp.text[:200]}")
@@ -129,6 +130,7 @@ class DSHClient:
                       "text": text, "provider": provider, "model": model,
                       "agent_preset": agent_preset, "workspace_id": workspace_id,
                       "temperature": temperature, "max_tokens": max_tokens},
+                timeout=max(self.cfg.timeout_s, 120.0),
             )
             if resp.status_code != 200:
                 raise DSHUnavailable(f"DSH Session chat HTTP {resp.status_code}: {resp.text[:200]}")
