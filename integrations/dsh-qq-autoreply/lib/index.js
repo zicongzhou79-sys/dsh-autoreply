@@ -254,11 +254,12 @@ async function runSessionTurn(ctx, body) {
         : await ctx.agents.create({ sessionId, meta: { cwd: body.workspace_id || undefined, agentPreset: body.agent_preset || undefined }, agentOptions: { provider, model, maxTokens: body.max_tokens }, setup })
       agent = handle.agent
     }
-    agent.inject(makeMessage({ role: 'user', content: [{ type: 'text', text }], source: { kind: 'user' } }))
+    agent.followup(makeMessage({ role: 'user', content: [{ type: 'text', text }], source: { kind: 'user' } }))
     await agent.whenIdle()
     const messages = agent.session.deriveMessages()
     const last = [...messages].reverse().find((message) => message.role === 'assistant')
-    return { provider, model, session_id: sessionId, content: last ? last.content.map((part) => part.type === 'text' ? part.text : '').join('') : '' }
+    if (!last) throw new Error('DSH Agent 未产生回复')
+    return { provider, model, session_id: sessionId, content: last.content.map((part) => part.type === 'text' ? part.text : '').join('') }
   }
   const userMessage = makeMessage({ role: 'user', content: [{ type: 'text', text }], source: { kind: 'user' } })
   const userEvent = session.append('user/message', userMessage, { surfaceOp: 'append', sourceEventSeqs: [] })
