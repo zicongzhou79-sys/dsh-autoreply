@@ -11,6 +11,7 @@
    - mention      → 需 at_self 或引用自己
    - keyword      → 消息文本命中 group_keywords
    - all          → 全部可回
+   - autonomous   → 交给 DSH Agent 结合上下文自主判断
 6. 敏感词命中 → blocked:sensitive
 7. （频率限制在 service 层，因需要 DB 统计）→ skipped:rate_limited
 """
@@ -50,7 +51,7 @@ def decide(cfg: EngineCfg, msg: ParsedMessage, self_id: Optional[str] = None) ->
     mode = cfg.group_mode
     if mode == "off":
         return False, "group_off"
-    if mode == "all":
+    if mode in ("all", "autonomous"):
         return True, ""
     if mode == "mention":
         if msg.at_self:

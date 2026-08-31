@@ -35,7 +35,7 @@ class FakeDSH:
         return "session-test"
 
     async def session_chat(self, session_id, chat_key, text, provider, model, agent_preset,
-                           workspace_id, temperature, max_tokens):
+                           workspace_id, temperature, max_tokens, content=None):
         self.chats.append({
             "session_id": session_id, "chat_key": chat_key, "text": text,
             "provider": provider, "model": model, "agent_preset": agent_preset,
@@ -117,6 +117,17 @@ async def test_group_no_mention_skipped():
     assert not gw.sent
     assert db.list_reply_logs()[0]["reason"] == "no_mention"
     assert not dsh.chats
+
+
+@pytest.mark.asyncio
+async def test_group_autonomous_can_skip_without_sending():
+    gw = FakeGateway()
+    dsh = FakeDSH(reply='{"reply":false,"reason":"普通闲聊"}')
+    svc = make_service(gw, dsh)
+    svc.cfg.engine.group_mode = "autonomous"
+    await svc.handle(make_msg("大家好", chat_type="group", at_self=False))
+    assert not gw.sent
+    assert db.list_reply_logs()[0]["reason"] == "autonomous:普通闲聊"
 
 
 @pytest.mark.asyncio

@@ -71,7 +71,7 @@ class BlacklistCfg(BaseModel):
 class EngineCfg(BaseModel):
     master_switch: bool = True
     private_auto: bool = True          # 私聊全自动
-    group_mode: str = "mention"        # mention|keyword|all|off
+    group_mode: str = "mention"        # mention|keyword|all|autonomous|off
     group_keywords: list[str] = Field(default_factory=list)
     whitelist: WhitelistCfg = Field(default_factory=WhitelistCfg)
     blacklist: BlacklistCfg = Field(default_factory=BlacklistCfg)

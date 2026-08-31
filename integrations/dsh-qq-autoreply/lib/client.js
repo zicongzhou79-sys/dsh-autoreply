@@ -333,6 +333,7 @@ function RulesSection() {
             React.createElement('option', { value: 'mention' }, '被 @ 时回复'),
             React.createElement('option', { value: 'keyword' }, '关键词命中时回复'),
             React.createElement('option', { value: 'all' }, '全部消息回复'),
+            React.createElement('option', { value: 'autonomous' }, '自主判断'),
             React.createElement('option', { value: 'off' }, '关闭群聊自动回复'))),
         ),
       );

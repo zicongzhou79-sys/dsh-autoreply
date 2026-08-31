@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import asdict
+import json
 import logging
 import re
 import time
@@ -147,6 +148,22 @@ class ReplyService:
             parts.append({"type": "image_url", "image_url": {"url": data_url}})
         return parts
 
+    async def _ensure_dsh_session(self, msg: ParsedMessage, sess: Optional[dict]) -> tuple[str, Optional[dict]]:
+        """Create the DSH-owned session once and persist its binding."""
+        session_id = (sess or {}).get("dsh_session_id", "")
+        if not session_id:
+            session_id = await self.dsh.create_session(
+                msg.chat_key,
+                agent_preset=(sess or {}).get("agent_preset") or self.cfg.engine.dsh.agent_preset,
+                provider=(sess or {}).get("model_provider") or self.cfg.llm.provider,
+                model=(sess or {}).get("model_name") or self.cfg.llm.model,
+                workspace_id=(sess or {}).get("workspace_dir") or self.cfg.engine.workspace_dir,
+            )
+            if session_id:
+                db.update_session_binding(msg.chat_key, dsh_session_id=session_id)
+                sess = db.get_session(msg.chat_key)
+        return session_id, sess
+
     async def handle(self, msg: ParsedMessage) -> None:
         self.refresh_config()
         peer_name = await self._resolve_peer_name(msg)
@@ -230,22 +247,47 @@ class ReplyService:
         if any(a.kind == "image" for a in msg.attachments):
             content = await self._image_content(msg)
 
+        if msg.chat_type == "group" and self.cfg.engine.group_mode == "autonomous":
+            decision_prompt = (
+                "你是群聊自动回复决策器。结合当前消息、群聊场景和会话上下文判断是否值得回复。"
+                "只有确实需要你参与、能提供帮助或对方明显在和你交流时才回复；闲聊、无关消息、"
+                "重复内容和不需要回应的消息不要回复。只输出严格 JSON，不要 Markdown："
+                '{"reply":true或false,"reason":"简短原因"}'
+            )
+            decision_content = [{"type": "text", "text": decision_prompt}] + (content[1:] if content else [])
+            try:
+                dsh_session_id, sess = await self._ensure_dsh_session(msg, sess)
+                verdict = await self.dsh.session_chat(
+                    dsh_session_id, msg.chat_key, decision_prompt,
+                    (sess or {}).get("model_provider") or self.cfg.llm.provider,
+                    (sess or {}).get("model_name") or self.cfg.llm.model,
+                    (sess or {}).get("agent_preset") or self.cfg.engine.dsh.agent_preset,
+                    (sess or {}).get("workspace_dir") or self.cfg.engine.workspace_dir,
+                    self.cfg.llm.temperature, 120,
+                    content=decision_content,
+                )
+            except DSHUnavailable as exc:
+                db.add_reply_log(msg_id, msg.chat_key, "failed", f"autonomous_decision:{str(exc)[:200]}")
+                return
+            match = re.search(r"\{[^{}]*\}", verdict or "")
+            try:
+                decision = json.loads(match.group(0)) if match else {}
+            except json.JSONDecodeError:
+                decision = {}
+            if decision.get("reply") is not True:
+                reason = str(decision.get("reason") or "ai_no_reply")[:200]
+                db.add_reply_log(msg_id, msg.chat_key, "skipped", f"autonomous:{reason}")
+                await self.hub.broadcast("reply_skip", {
+                    "msg_id": msg_id, "chat_key": msg.chat_key,
+                    "reason": f"autonomous:{reason}", "ts": time.time(),
+                })
+                return
+
         start = time.time()
         try:
             if not sess:
                 sess = db.get_session(msg.chat_key)
-            dsh_session_id = (sess or {}).get("dsh_session_id", "")
-            if not dsh_session_id:
-                dsh_session_id = await self.dsh.create_session(
-                    msg.chat_key,
-                    agent_preset=(sess or {}).get("agent_preset") or self.cfg.engine.dsh.agent_preset,
-                    provider=(sess or {}).get("model_provider") or self.cfg.llm.provider,
-                    model=(sess or {}).get("model_name") or self.cfg.llm.model,
-                    workspace_id=(sess or {}).get("workspace_dir") or self.cfg.engine.workspace_dir,
-                )
-                if dsh_session_id:
-                    db.update_session_binding(msg.chat_key, dsh_session_id=dsh_session_id)
-                    sess = db.get_session(msg.chat_key)
+            dsh_session_id, sess = await self._ensure_dsh_session(msg, sess)
             reply = await self.dsh.session_chat(
                 dsh_session_id, msg.chat_key, msg.text,
                 (sess or {}).get("model_provider") or self.cfg.llm.provider,
