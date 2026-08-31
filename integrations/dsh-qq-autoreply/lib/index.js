@@ -10,7 +10,7 @@
  */
 
 export const name = 'dsh-qq-autoreply'
-export const inject = ['webServer', 'tools', 'systemPrompt', 'sessions', 'agents', 'agentPresets']
+export const inject = ['webServer', 'tools', 'systemPrompt', 'sessions', 'agents', 'agentPresets', 'workspaceRegistry']
 
 const DEFAULT_URL = process.env.AUTOREPLY_URL || 'http://127.0.0.1:8001'
 const AUTOREPLY_KEY = process.env.AUTOREPLY_TOKEN || '' // Bearer token if AutoReply requires one (empty = open)
@@ -223,6 +223,16 @@ async function handlePersona() {
 }
 
 
+async function attachSessionToWorkspace(ctx, session) {
+  if (!ctx || !ctx.workspaceRegistry || !session || !session.header || !session.header.cwd) return
+  try {
+    const ws = await ctx.workspaceRegistry.resolveByPath(session.header.cwd)
+    if (ws) await ws.attachSession(session.id)
+  } catch (e) {
+    // 工作区 attach 是增强行为，失败不应阻断回复。
+  }
+}
+
 async function runSessionTurn(ctx, body) {
   const sessionId = String(body.session_id || '')
   const text = String(body.text || '')
@@ -252,6 +262,7 @@ async function runSessionTurn(ctx, body) {
     }
     agent = handle.agent
   }
+  await attachSessionToWorkspace(ctx, agent.session)
   agent.followup(makeMessage({ role: 'user', content: [{ type: 'text', text }], source: { kind: 'user' } }))
   await agent.whenIdle()
   const messages = agent.session.deriveMessages()
@@ -269,6 +280,7 @@ async function handleDshSession(ctx, body) {
     const setup = ctx.agentPresets ? async (agentCtx) => { await ctx.agentPresets.mount(agentCtx, body.agent_preset || undefined) } : undefined
     const handle = await ctx.agents.create({ sessionId: body.id || `qqa-${Date.now()}`, meta: { cwd: resolveCwd(body.workspace_id), agentPreset: body.agent_preset || undefined }, agentOptions: { provider: body.provider || undefined, model: body.model || undefined, maxTokens: body.max_tokens }, setup })
     const session = handle.agent.session
+    await attachSessionToWorkspace(ctx, session)
     return { session: { id: session.id, cwd: session.header.cwd, createdAt: session.header.createdAt } }
   }
   if (action === 'chat') {
