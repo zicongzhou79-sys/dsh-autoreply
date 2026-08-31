@@ -146,10 +146,11 @@ window.__ModuleLoader__.load({
   .qqa-topbar-status { display: flex; align-items: center; gap: 5px; color: var(--dsw-alias-label-secondary,#8a8f98); font-size: 11px; white-space: nowrap; }
   .qqa-topbar .spacer { flex: 1; }
   .qqa-login-actions { display: flex; gap: 6px; margin-top: 6px; }
+  .qqa-binding-top { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .qqa-login-actions .qqa-btn { flex: 1; min-width: 0; padding: 6px 4px; border: 1px solid var(--dsw-alias-border-l1,rgba(128,128,128,.2)); border-radius: 6px; background: var(--dsw-alias-bg-layer-1,rgba(0,0,0,.04)); color: var(--dsw-alias-label-primary,#e6edf3); font-size: 11px; cursor: pointer; white-space: nowrap; }
   .qqa-login-actions .qqa-btn:hover { border-color: var(--dsw-alias-brand-primary,#58a6ff); }
   .qqa-bind-list { display: grid; gap: 6px; margin-top: 8px; }
-  .qqa-bind-row { display: grid; grid-template-columns: minmax(0,1fr) 64px 46px; align-items: center; gap: 6px; padding: 7px 8px; border: 1px solid var(--dsw-alias-border-l1,rgba(128,128,128,.15)); border-radius: 6px; background: var(--dsw-alias-bg-layer-1,rgba(0,0,0,.04)); }
+  .qqa-bind-row { display: grid; grid-template-columns: minmax(0,1fr) 86px 66px; align-items: center; gap: 6px; padding: 7px 8px; border: 1px solid var(--dsw-alias-border-l1,rgba(128,128,128,.15)); border-radius: 6px; background: var(--dsw-alias-bg-layer-1,rgba(0,0,0,.04)); }
   .qqa-bind-name { min-width: 0; }
   .qqa-bind-name strong { display: block; font-weight: 500; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .qqa-bind-name small { display: block; color: var(--dsw-alias-label-secondary,#8a8f98); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -246,70 +247,66 @@ window.__ModuleLoader__.load({
 
 function SessionBindingEditor({ sessions, agents, workspaces, models, onSave, onToggleAuto, onDeleteBinding }) {
       const [chatKey, setChatKey] = React.useState('');
-      const [agent, setAgent] = React.useState('');
-      const [model, setModel] = React.useState('');
       const [workspace, setWorkspace] = React.useState('');
-      const [sessionDir, setSessionDir] = React.useState('');
-      const [dshSession, setDshSession] = React.useState('');
+      const [model, setModel] = React.useState('');
+      const [agent, setAgent] = React.useState('');
       const [saving, setSaving] = React.useState(false);
-      const list = sessions && sessions.length ? sessions : [];
+      const list = sessions || [];
       return React.createElement('div', { className: 'qqa-section' },
         React.createElement('h4', null, '会话绑定'),
-        React.createElement('div', { className: 'qqa-bind-list' },
-          ...(sessions || []).filter((s) => s.dsh_session_id).map((s) => React.createElement('div', { className: 'qqa-bind-row', key: s.chat_key },
-            React.createElement('div', { className: 'qqa-bind-name' },
-              React.createElement('strong', null, s.peer_name || s.chat_key),
-              React.createElement('small', null, (s.chat_type === 'group' ? '群' : '友') + ' · ' + (s.dsh_session_id || '未绑定'))),
-            React.createElement('span', { className: 'qqa-bind-tag' }, s.agent_preset || '默认'),
-            React.createElement('div', { className: 'qqa-bind-actions' },
-              React.createElement('label', { className: 'qqa-toggle' },
-                React.createElement('input', { type: 'checkbox', checked: !!s.auto_on, onChange: (e) => onToggleAuto && onToggleAuto(s.chat_key, e.target.checked) }),
-                React.createElement('span', { className: 'tknob' })),
-              React.createElement('button', { className: 'qqa-mini', onClick: () => onDeleteBinding && onDeleteBinding(s.chat_key) }, '删除'),
-            ),
-          )),
-        ),
-        React.createElement('select', { className: 'qqa-select', value: chatKey, onChange: (e) => setChatKey(e.target.value) },
-          React.createElement('option', { value: '' }, '选择会话…'),
-          ...list.map((s) => React.createElement('option', { key: s.chat_key, value: s.chat_key }, String(s.peer_name || s.chat_key).slice(0, 18))),
-        ),
         React.createElement('div', { className: 'qqa-field' },
-          React.createElement('label', null, 'Agent preset'),
-          React.createElement('select', { className: 'qqa-select', value: agent, onChange: (e) => setAgent(e.target.value) },
-            React.createElement('option', { value: '' }, '跟随全局'),
-            ...agents.map((a) => React.createElement('option', { key: a.id, value: a.id }, a.label)),
+          React.createElement('label', null, '已绑定会话 · 管理启用状态与删除'),
+          React.createElement('div', { className: 'qqa-bind-list' },
+            ...list.filter((s) => s.dsh_session_id).map((s) => React.createElement('div', { className: 'qqa-bind-row', key: s.chat_key },
+              React.createElement('div', { className: 'qqa-bind-name' },
+                React.createElement('strong', null, s.peer_name || s.chat_key),
+                React.createElement('small', null, (s.chat_type === 'group' ? '群' : '友') + ' · ' + (s.dsh_session_id || '未绑定'))),
+              React.createElement('span', { className: 'qqa-bind-tag' }, s.agent_preset || '默认'),
+              React.createElement('div', { className: 'qqa-bind-actions' },
+                React.createElement('label', { className: 'qqa-toggle' },
+                  React.createElement('input', { type: 'checkbox', checked: !!s.auto_on, onChange: (e) => onToggleAuto && onToggleAuto(s.chat_key, e.target.checked) }),
+                  React.createElement('span', { className: 'tknob' })),
+                React.createElement('button', { className: 'qqa-mini', onClick: () => onDeleteBinding && onDeleteBinding(s.chat_key) }, '删除'),
+              ),
+            )),
+          ),
+        ),
+        React.createElement('div', { className: 'qqa-binding-top' },
+          React.createElement('div', { className: 'qqa-field' },
+            React.createElement('label', null, '工作区'),
+            React.createElement('select', { className: 'qqa-select', value: workspace, onChange: (e) => setWorkspace(e.target.value) },
+              React.createElement('option', { value: '' }, '使用当前工作区'),
+              ...(workspaces || []).map((w) => React.createElement('option', { key: w.id, value: w.path }, w.label))),
+          ),
+          React.createElement('div', { className: 'qqa-field' },
+            React.createElement('label', null, '绑定 DSH 会话'),
+            React.createElement('select', { className: 'qqa-select', value: chatKey, onChange: (e) => setChatKey(e.target.value) },
+              React.createElement('option', { value: '' }, '选择私聊或群聊对象'),
+              ...list.map((s) => React.createElement('option', { key: s.chat_key, value: s.chat_key }, String(s.peer_name || s.chat_key) + ' · ' + s.chat_key))),
           ),
         ),
         React.createElement('div', { className: 'qqa-field' },
-          React.createElement('label', null, '模型'),
-          React.createElement('select', { className: 'qqa-select', value: model, onChange: (e) => setModel(e.target.value) },
-            React.createElement('option', { value: '' }, '跟随全局'),
-            ...(models || []).map((m) => React.createElement('option', { key: m.value, value: m.value }, m.label))),
-        ),
-        React.createElement('div', { className: 'qqa-field' },
-          React.createElement('label', null, '工作区'),
-          React.createElement('select', { className: 'qqa-select', value: workspace, onChange: (e) => setWorkspace(e.target.value) },
-            React.createElement('option', { value: '' }, '跟随全局'),
-            ...workspaces.map((w) => React.createElement('option', { key: w.id, value: w.path }, w.label))),
-        ),
-        React.createElement('div', { className: 'qqa-field' },
-          React.createElement('label', null, '会话目录'),
-          React.createElement('input', { type: 'text', className: 'qqa-select', value: sessionDir, onChange: (e) => setSessionDir(e.target.value), placeholder: '留空使用默认' }),
-        ),
-        React.createElement('div', { className: 'qqa-field' },
-          React.createElement('label', null, 'DSH Session ID'),
-          React.createElement('input', { type: 'text', className: 'qqa-select', value: dshSession, onChange: (e) => setDshSession(e.target.value), placeholder: '可选' }),
+          React.createElement('label', null, '此会话的 DSH 配置'),
+          React.createElement('div', { className: 'qqa-binding-top' },
+            React.createElement('select', { className: 'qqa-select', value: model, onChange: (e) => setModel(e.target.value) },
+              React.createElement('option', { value: '' }, '跟随全局'),
+              ...(models || []).map((m) => React.createElement('option', { key: m.value, value: m.value }, m.label))),
+            React.createElement('select', { className: 'qqa-select', value: agent, onChange: (e) => setAgent(e.target.value) },
+              React.createElement('option', { value: '' }, '跟随全局'),
+              ...(agents || []).map((a) => React.createElement('option', { key: a.id, value: a.id }, a.label))),
+          ),
         ),
         React.createElement('button', { className: 'qqa-btn-primary', disabled: !chatKey || saving,
           onClick: async () => {
             setSaving(true);
             try {
-              await onSave({ chat_key: chatKey, agent_preset: agent, model_provider: model.split(':')[0] || '', model_name: model.split(':').slice(1).join(':'), workspace_dir: workspace, session_dir: sessionDir, dsh_session_id: dshSession });
+              await onSave({ chat_key: chatKey, agent_preset: agent, model_provider: model.split(':')[0] || '', model_name: model.split(':').slice(1).join(':'), workspace_dir: workspace });
               setSaving(false);
             } catch (e) { setSaving(false); alert(e.message || String(e)); }
-          } }, saving ? '保存中…' : '保存会话绑定'),
+          } }, saving ? '保存中…' : '绑定会话'),
       );
     }
+
 function RulesSection() {
       const [values, setValues] = React.useState({ private_auto: true, group_mode: 'mention' });
       React.useEffect(() => {
