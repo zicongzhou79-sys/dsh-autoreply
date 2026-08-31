@@ -127,6 +127,33 @@ async def test_client_call_tool_ok(monkeypatch):
     assert await client.call_tool("web_search", {"query": "q"}) == {"answer": "检索结果"}
 
 
+
+
+@pytest.mark.asyncio
+async def test_client_session_chat_contract(monkeypatch):
+    import httpx
+    client = DSHClient(DshCfg(enabled=True, base_url="http://127.0.0.1:1"))
+
+    class FakeResp:
+        status_code = 200
+        text = ""
+        def json(self):
+            return {"ok": True, "result": {"content": "session reply"}}
+
+    class FakeClient:
+        async def post(self, url, json=None):
+            assert url == "http://127.0.0.1:1/dsh-qq/session"
+            assert json == {
+                "action": "chat", "session_id": "s1", "chat_key": "friend:1",
+                "text": "hello", "provider": "p", "model": "m",
+                "agent_preset": "agent", "workspace_id": "/tmp/work",
+                "temperature": 0.7, "max_tokens": 50,
+            }
+            return FakeResp()
+
+    monkeypatch.setattr(httpx, "AsyncClient", lambda timeout=None, trust_env=None: FakeClient())
+    assert await client.session_chat("s1", "friend:1", "hello", "p", "m", "agent", "/tmp/work", 0.7, 50) == "session reply"
+
 @pytest.mark.asyncio
 async def test_engine_uses_dsh_for_tools_and_generation():
     dsh = FakeDSH(tool_result="据检索：今天天气晴")

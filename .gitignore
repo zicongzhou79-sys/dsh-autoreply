@@ -12,6 +12,12 @@ __pycache__/
 # 本地配置（含密钥）
 backend/config.yaml
 
+
+# NapCat 本地配置和 QQ 登录态（含 token/凭据）
+deploy/napcat/config/
+deploy/napcat/qq-config/
+deploy/napcat/data/
+
 # 前端构建产物（若未来启用）
 frontend/dist/
 frontend/node_modules/
