@@ -53,6 +53,23 @@ def test_parse_non_message_event():
     assert parse_message({"post_type": "meta_event", "meta_event_type": "heartbeat"}, "1") is None
 
 
+def test_parse_image_attachment():
+    frame = {
+        "post_type": "message", "message_type": "private",
+        "message_id": 3, "user_id": 10001,
+        "sender": {"nickname": "小明"},
+        "message": [{"type": "image", "data": {
+            "file": "photo.jpg", "url": "https://cdn.example/photo.jpg", "file_size": "42"
+        }}],
+    }
+    message = parse_message(frame)
+    assert message is not None
+    assert message.text == "[图片]"
+    assert len(message.attachments) == 1
+    assert message.attachments[0].kind == "image"
+    assert message.attachments[0].url.endswith("photo.jpg")
+
+
 # ---------- 决策器 ----------
 
 def make_msg(chat_type="friend", at_self=False, text="hi", group_id="g1"):

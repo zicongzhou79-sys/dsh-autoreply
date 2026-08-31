@@ -119,17 +119,20 @@ class DSHClient:
     async def session_chat(self, session_id: str, chat_key: str, text: str,
                            provider: str, model: str, agent_preset: str = "",
                            workspace_id: str = "", temperature: float = 0.7,
-                           max_tokens: int = 500) -> str:
-        """Run one turn in a DSH-owned session; no local history is sent."""
+                           max_tokens: int = 500, content: Optional[list[dict]] = None) -> str:
+        """Run one turn in a DSH-owned session; content may include image parts."""
         if not session_id:
             raise DSHUnavailable("未绑定 DSH Session")
         try:
+            payload = {"action": "chat", "session_id": session_id, "chat_key": chat_key,
+                       "text": text, "provider": provider, "model": model,
+                       "agent_preset": agent_preset, "workspace_id": workspace_id,
+                       "temperature": temperature, "max_tokens": max_tokens}
+            if content:
+                payload["content"] = content
             resp = await self._get_client().post(
                 f"{self.cfg.base_url.rstrip('/')}/dsh-qq/session",
-                json={"action": "chat", "session_id": session_id, "chat_key": chat_key,
-                      "text": text, "provider": provider, "model": model,
-                      "agent_preset": agent_preset, "workspace_id": workspace_id,
-                      "temperature": temperature, "max_tokens": max_tokens},
+                json=payload,
                 timeout=max(self.cfg.timeout_s, 120.0),
             )
             if resp.status_code != 200:

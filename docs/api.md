@@ -31,7 +31,7 @@
 - `GET /dsh-qq/health`
 - `POST /dsh-qq/execute`，请求体为 `{ "tool": "status", "args": {} }`
 - `GET /dsh-qq/persona`（兼容读取接口）
-- `POST /dsh-qq/session`，支持 `list`、`get`、`create`、`chat`；`chat` 只接收当前消息和 DSH 资源引用，Session 上下文由 DSH Agent 持有
+- `POST /dsh-qq/session`，支持 `list`、`get`、`create`、`chat`；`chat` 只接收当前消息和 DSH 资源引用，Session 上下文由 DSH Agent 持有。图片消息可通过 `content` 传递 `text` 和 `image_url` parts，前提是所选模型支持视觉输入。
 
 ## DSH 原生 API
 

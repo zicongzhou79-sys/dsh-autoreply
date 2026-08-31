@@ -21,6 +21,7 @@ from typing import Optional
 from app.config import AppConfig
 from app.dsh_client import DSHClient, DSHUnavailable
 from app.engine.decision import check_sensitive, decide
+from app.media.images import resolve_image_data_url
 from app.onebot.events import EventBus
 from app.onebot.gateway import OneBotGateway
 from app.onebot.protocol import ParsedMessage, cq_encode
@@ -120,6 +121,32 @@ class ReplyService:
             pass
         return msg.sender_name
 
+    async def _image_content(self, msg: ParsedMessage) -> list[dict]:
+        """Resolve image attachments into multimodal DSH content parts."""
+        parts: list[dict] = [{"type": "text", "text": msg.text or "请查看图片并回复。"}]
+        for attachment in msg.attachments:
+            if attachment.kind != "image":
+                continue
+            url = attachment.url
+            if not url and attachment.file:
+                get_image = getattr(self.gateway, "get_image", None)
+                if get_image is not None:
+                    try:
+                        result = await get_image(attachment.file)
+                        url = str((result or {}).get("url", ""))
+                    except Exception as exc:
+                        log.warning("获取 QQ 图片失败 file=%s: %s", attachment.file, exc)
+            if not url:
+                log.warning("QQ 图片没有可用 URL file=%s", attachment.file)
+                continue
+            try:
+                data_url = await resolve_image_data_url(url)
+            except Exception as exc:
+                log.warning("下载 QQ 图片失败: %s", exc)
+                continue
+            parts.append({"type": "image_url", "image_url": {"url": data_url}})
+        return parts
+
     async def handle(self, msg: ParsedMessage) -> None:
         self.refresh_config()
         peer_name = await self._resolve_peer_name(msg)
@@ -199,6 +226,10 @@ class ReplyService:
             return
 
 
+        content = None
+        if any(a.kind == "image" for a in msg.attachments):
+            content = await self._image_content(msg)
+
         start = time.time()
         try:
             if not sess:
@@ -222,6 +253,7 @@ class ReplyService:
                 (sess or {}).get("agent_preset") or self.cfg.engine.dsh.agent_preset,
                 (sess or {}).get("workspace_dir") or self.cfg.engine.workspace_dir,
                 self.cfg.llm.temperature, self.cfg.llm.max_tokens,
+                **({"content": content} if content else {}),
             )
             duration_ms = (time.time() - start) * 1000
         except DSHUnavailable as e:

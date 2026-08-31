@@ -16,7 +16,7 @@ DeepSeek Harness ↔ QQ AutoReply 双向互通插件。
 | `qq_autoreply_logs` | 回复决策日志 |
 | `qq_autoreply_test_llm` | 通过 DSH runtime 测试当前模型 |
 
-**AutoReply → DSH（唯一智能运行时）**：AutoReply 将当前 QQ 消息交给绑定的 DSH Session/Agent。DSH Agent 负责上下文、工具、模型和记忆，Session 事件由 DSH persistence 插件落盘；AutoReply 不复制 Agent prompt 或本地历史。
+**AutoReply → DSH（唯一智能运行时）**：AutoReply 将当前 QQ 消息交给绑定的 DSH Session/Agent。图片消息会在后端完成公网 URL 校验、大小和真实格式校验后，以 `image_url` 多模态内容传给 DSH；所选模型必须支持视觉输入。DSH Agent 负责上下文、工具、模型和记忆，Session 事件由 DSH persistence 插件落盘；AutoReply 不复制 Agent prompt 或本地历史。
 
 - `GET /dsh-qq/health` —— AutoReply 健康探测
 - `POST /dsh-qq/execute` —— DSH 工具执行（`{tool, args}`）

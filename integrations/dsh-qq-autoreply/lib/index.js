@@ -239,6 +239,14 @@ async function runSessionTurn(ctx, body) {
   const provider = String(body.provider || '')
   const model = String(body.model || '')
   if (!sessionId || !text || !provider || !model) throw new Error('session_id/text/provider/model required')
+  const content = Array.isArray(body.content) && body.content.length
+    ? body.content
+    : [{ type: 'text', text }]
+  const messageContent = content.filter((part) =>
+    (part && part.type === 'text' && typeof part.text === 'string') ||
+    (part && part.type === 'image_url' && part.image_url && typeof part.image_url.url === 'string')
+  )
+  if (!messageContent.length) throw new Error('message content is empty')
   if (!ctx.agents) throw new Error('DSH agents 服务未挂载，请检查 profile 是否包含 Agent loop')
   const session = ctx.sessions.get(sessionId)
   let agent = ctx.agents.get(sessionId)
@@ -263,7 +271,7 @@ async function runSessionTurn(ctx, body) {
     agent = handle.agent
   }
   await attachSessionToWorkspace(ctx, agent.session)
-  agent.followup(makeMessage({ role: 'user', content: [{ type: 'text', text }], source: { kind: 'user' } }))
+  agent.followup(makeMessage({ role: 'user', content: messageContent, source: { kind: 'user' } }))
   await agent.whenIdle()
   const messages = agent.session.deriveMessages()
   const last = [...messages].reverse().find((message) => message.role === 'assistant')

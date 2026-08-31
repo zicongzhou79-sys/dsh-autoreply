@@ -98,9 +98,10 @@ def parse_message(frame: dict, self_id: Optional[str] = None) -> Optional[Parsed
             attachments.append(Attachment(
                 kind=t, file=str(data.get("file", "")), url=str(data.get("url", "")),
                 name=str(data.get("name", "") or data.get("file", "")),
-                size=int(data["size"]) if str(data.get("size", "")).isdigit() else None,
+                size=int(data.get("size", data.get("file_size", 0))) if str(data.get("size", data.get("file_size", ""))).isdigit() else None,
                 raw=data,
             ))
+            text_parts.append(_NON_TEXT_PLACEHOLDER.get(t, f"[{t}]"))
 
         else:
             placeholder = _NON_TEXT_PLACEHOLDER.get(t, f"[{t}]")

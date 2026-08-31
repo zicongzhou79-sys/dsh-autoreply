@@ -39,6 +39,10 @@ class OneBotGateway:
     async def get_group_info(self, group_id: str) -> dict:
         return await self._ws.call("get_group_info", {"group_id": int(group_id)})
 
+    async def get_image(self, file: str) -> dict:
+        """Resolve a OneBot image file name to a temporary URL/path."""
+        return await self._ws.call("get_image", {"file": file})
+
     async def send(self, chat_key: str, message: str) -> dict:
         if chat_key.startswith("group:"):
             return await self.send_group_msg(chat_key[6:], message)

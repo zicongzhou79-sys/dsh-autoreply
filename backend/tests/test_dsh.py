@@ -190,6 +190,27 @@ async def test_client_session_chat_contract(monkeypatch):
     assert await client.session_chat("s1", "friend:1", "hello", "p", "m", "agent", "/tmp/work", 0.7, 50) == "session reply"
 
 @pytest.mark.asyncio
+async def test_client_session_chat_sends_image_content(monkeypatch):
+    import httpx
+    client = DSHClient(DshCfg(enabled=True, base_url="http://127.0.0.1:1"))
+    expected = [{"type": "text", "text": "请看图"}, {"type": "image_url", "image_url": {"url": "data:image/png;base64,AA=="}}]
+
+    class FakeResp:
+        status_code = 200
+        text = ""
+        def json(self):
+            return {"ok": True, "result": {"content": "看到了"}}
+
+    class FakeClient:
+        async def post(self, url, json=None, timeout=None):
+            assert json["content"] == expected
+            return FakeResp()
+
+    monkeypatch.setattr(httpx, "AsyncClient", lambda timeout=None, trust_env=None: FakeClient())
+    assert await client.session_chat("s1", "friend:1", "请看图", "p", "m", content=expected) == "看到了"
+
+
+@pytest.mark.asyncio
 async def test_session_empty_reply_does_not_send():
     dsh = FakeSessionDSH(reply="")
     svc, gw = make_service(dsh)
