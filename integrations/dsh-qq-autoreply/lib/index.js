@@ -272,8 +272,6 @@ async function handleDshSession(ctx, body) {
     return { session: { id: session.id, cwd: session.header.cwd, createdAt: session.header.createdAt } }
   }
   if (action === 'chat') {
-    const session = ctx.sessions.get(body.session_id)
-    if (!session) throw new Error(`DSH Session 不存在: ${body.session_id || ''}`)
     return await runSessionTurn(ctx, body)
   }
   if (action === 'get') {
