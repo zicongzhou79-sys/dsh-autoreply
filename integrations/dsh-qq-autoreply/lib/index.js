@@ -299,6 +299,10 @@ async function runTool(tool, args) {
       const limit = args && args.limit ? args.limit : 50
       return await ar('GET', `/api/sessions?limit=${limit}`)
     }
+    case 'session_auto': case 'qq_autoreply_session_auto': {
+      if (!args || !args.chat_key) throw new Error('需要 chat_key')
+      return await ar('POST', '/api/sessions/auto', { chat_key: args.chat_key, auto_on: !!args.auto_on })
+    }
     case 'messages': case 'qq_autoreply_messages': {
       if (!args || !args.chat_key) throw new Error('需要 chat_key')
       const limit = args.limit || 100

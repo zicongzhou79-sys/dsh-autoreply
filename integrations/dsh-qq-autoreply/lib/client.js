@@ -140,6 +140,39 @@ window.__ModuleLoader__.load({
     color: var(--dsw-alias-label-primary, #e6edf3); background: var(--dsw-alias-bg-layer-1, rgba(0,0,0,.12)); font-size: 12px; }
   .qqa-session-list { max-height: 150px; overflow-y: auto; }
   .qqa-error { color: var(--dsw-alias-state-error-primary, #f85149); margin: 6px 0; }
+  .qqa-topbar { display: flex; align-items: center; gap: 10px; padding-bottom: 12px; margin-bottom: 14px; border-bottom: 1px solid var(--dsw-alias-border-l1,rgba(128,128,128,.15)); }
+  .qqa-topbar-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 400; color: var(--dsw-alias-label-primary,#e6edf3); white-space: nowrap; }
+  .qqa-brand-icon { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 6px; background: var(--dsw-alias-label-primary,#e6edf3); color: #111; font-size: 10px; font-weight: 700; }
+  .qqa-topbar-status { display: flex; align-items: center; gap: 5px; color: var(--dsw-alias-label-secondary,#8a8f98); font-size: 11px; white-space: nowrap; }
+  .qqa-topbar .spacer { flex: 1; }
+  .qqa-login-actions { display: flex; gap: 6px; margin-top: 6px; }
+  .qqa-login-actions .qqa-btn { flex: 1; min-width: 0; padding: 6px 4px; border: 1px solid var(--dsw-alias-border-l1,rgba(128,128,128,.2)); border-radius: 6px; background: var(--dsw-alias-bg-layer-1,rgba(0,0,0,.04)); color: var(--dsw-alias-label-primary,#e6edf3); font-size: 11px; cursor: pointer; white-space: nowrap; }
+  .qqa-login-actions .qqa-btn:hover { border-color: var(--dsw-alias-brand-primary,#58a6ff); }
+  .qqa-bind-list { display: grid; gap: 6px; margin-top: 8px; }
+  .qqa-bind-row { display: grid; grid-template-columns: minmax(0,1fr) 64px 46px; align-items: center; gap: 6px; padding: 7px 8px; border: 1px solid var(--dsw-alias-border-l1,rgba(128,128,128,.15)); border-radius: 6px; background: var(--dsw-alias-bg-layer-1,rgba(0,0,0,.04)); }
+  .qqa-bind-name { min-width: 0; }
+  .qqa-bind-name strong { display: block; font-weight: 500; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qqa-bind-name small { display: block; color: var(--dsw-alias-label-secondary,#8a8f98); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qqa-bind-tag { color: #a9d8ff; background: #183049; border-radius: 4px; padding: 3px 5px; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
+  .qqa-bind-actions { display: flex; align-items: center; gap: 4px; justify-content: flex-end; }
+  .qqa-mini { padding: 4px 6px; border: 1px solid var(--dsw-alias-border-l1,rgba(128,128,128,.2)); border-radius: 5px; background: transparent; color: var(--dsw-alias-label-secondary,#8a8f98); font-size: 10px; cursor: pointer; white-space: nowrap; }
+  .qqa-mini:hover { color: var(--dsw-alias-label-primary,#e6edf3); border-color: var(--dsw-alias-brand-primary,#58a6ff); }
+  .qqa-chat-layout { display: grid; grid-template-columns: 120px minmax(0,1fr); min-height: 220px; margin-top: 8px; border: 1px solid var(--dsw-alias-border-l1,rgba(128,128,128,.2)); border-radius: 8px; overflow: hidden; }
+  .qqa-chat-list { border-right: 1px solid var(--dsw-alias-border-l1,rgba(128,128,128,.2)); background: var(--dsw-alias-bg-layer-1,rgba(0,0,0,.03)); overflow-y: auto; }
+  .qqa-chat-item { padding: 8px 9px; cursor: pointer; border-bottom: 1px solid var(--dsw-alias-border-l1,rgba(128,128,128,.12)); font-size: 11px; }
+  .qqa-chat-item:hover, .qqa-chat-item.active { background: rgba(88,166,255,.12); }
+  .qqa-chat-item strong { display: block; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qqa-chat-item small { display: block; color: var(--dsw-alias-label-secondary,#8a8f98); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qqa-messages { display: flex; flex-direction: column; gap: 8px; padding: 10px; background: #0d1218; overflow-y: auto; }
+  .qqa-msg { display: flex; gap: 6px; align-items: flex-start; }
+  .qqa-msg.ai { flex-direction: row-reverse; }
+  .qqa-msg .qqa-avatar { width: 22px; height: 22px; flex: none; border-radius: 5px; background: #31465e; color: #dce6f0; font-size: 9px; display: grid; place-items: center; }
+  .qqa-msg.ai .qqa-avatar { background: #b9f0c9; color: #102217; }
+  .qqa-bubble { max-width: 85%; padding: 6px 8px; border-radius: 4px 7px 7px 7px; background: #202a38; font-size: 11px; text-align: left; word-break: break-word; }
+  .qqa-msg.ai .qqa-bubble { background: #b9f0c9; color: #102217; border-radius: 7px 4px 7px 7px; }
+  .qqa-msg.error .qqa-bubble { background: #3b2026; color: #ffb8bd; border: 1px solid #f8514966; }
+  .qqa-msg .qqa-meta { display: block; font-size: 9px; color: var(--dsw-alias-label-secondary,#8a8f98); margin-bottom: 2px; }
+  .qqa-chat-empty { display: grid; place-items: center; height: 100%; color: var(--dsw-alias-label-secondary,#8a8f98); font-size: 11px; }
 `;
 
     function fmtTime(ts) {
@@ -211,7 +244,7 @@ window.__ModuleLoader__.load({
       return items;
     }
 
-function SessionBindingEditor({ sessions, agents, workspaces, models, onSave }) {
+function SessionBindingEditor({ sessions, agents, workspaces, models, onSave, onToggleAuto, onDeleteBinding }) {
       const [chatKey, setChatKey] = React.useState('');
       const [agent, setAgent] = React.useState('');
       const [model, setModel] = React.useState('');
@@ -221,7 +254,21 @@ function SessionBindingEditor({ sessions, agents, workspaces, models, onSave }) 
       const [saving, setSaving] = React.useState(false);
       const list = sessions && sessions.length ? sessions : [];
       return React.createElement('div', { className: 'qqa-section' },
-        React.createElement('h4', null, '会话级绑定'),
+        React.createElement('h4', null, '会话绑定'),
+        React.createElement('div', { className: 'qqa-bind-list' },
+          ...(sessions || []).filter((s) => s.dsh_session_id).map((s) => React.createElement('div', { className: 'qqa-bind-row', key: s.chat_key },
+            React.createElement('div', { className: 'qqa-bind-name' },
+              React.createElement('strong', null, s.peer_name || s.chat_key),
+              React.createElement('small', null, (s.chat_type === 'group' ? '群' : '友') + ' · ' + (s.dsh_session_id || '未绑定'))),
+            React.createElement('span', { className: 'qqa-bind-tag' }, s.agent_preset || '默认'),
+            React.createElement('div', { className: 'qqa-bind-actions' },
+              React.createElement('label', { className: 'qqa-toggle' },
+                React.createElement('input', { type: 'checkbox', checked: !!s.auto_on, onChange: (e) => onToggleAuto && onToggleAuto(s.chat_key, e.target.checked) }),
+                React.createElement('span', { className: 'tknob' })),
+              React.createElement('button', { className: 'qqa-mini', onClick: () => onDeleteBinding && onDeleteBinding(s.chat_key) }, '删除'),
+            ),
+          )),
+        ),
         React.createElement('select', { className: 'qqa-select', value: chatKey, onChange: (e) => setChatKey(e.target.value) },
           React.createElement('option', { value: '' }, '选择会话…'),
           ...list.map((s) => React.createElement('option', { key: s.chat_key, value: s.chat_key }, String(s.peer_name || s.chat_key).slice(0, 18))),
@@ -291,109 +338,75 @@ function RulesSection() {
       const failures = (logs || []).filter((l) => l.chat_key === chatKey && l.decision === 'failed');
       return React.createElement('div', { className: 'qqa-section' },
         React.createElement('h4', null, '模拟聊天'),
-        React.createElement('select', { className: 'qqa-select', value: chatKey, onChange: (e) => setChatKey(e.target.value) },
-          React.createElement('option', { value: '' }, '选择私聊或群聊会话'),
-          ...list.map((s) => React.createElement('option', { key: s.chat_key, value: s.chat_key }, `${s.peer_name || s.chat_key} · ${s.chat_type === 'group' ? '群聊' : '私聊'}`))),
-        React.createElement('div', { className: 'qqa-chat' },
-          ...(messages.length ? messages.map((m) => React.createElement('div', { className: 'qqa-chat-msg', key: m.id }, React.createElement('b', null, m.nick || (m.direction === 'ai' ? 'AI' : '成员')), React.createElement('span', null, m.text || '（附件）'))) : [React.createElement('div', { className: 'qqa-note', key: 'empty' }, '暂无消息')]),
-          ...failures.slice(0, 3).map((l) => React.createElement('div', { className: 'qqa-chat-error', key: `failure-${l.id}` }, `回复失败：${l.reason || 'DSH Agent 暂时不可用'}。未发送到 QQ。`))),
+        React.createElement('div', { className: 'qqa-chat-layout' },
+          React.createElement('div', { className: 'qqa-chat-list' },
+            ...list.map((s) => React.createElement('div', { key: s.chat_key, className: 'qqa-chat-item' + (s.chat_key === chatKey ? ' active' : ''), onClick: () => setChatKey(s.chat_key) },
+              React.createElement('strong', null, s.peer_name || s.chat_key),
+              React.createElement('small', null, (s.chat_type === 'group' ? '群聊' : '私聊') + ' · ' + (s.last_text || '…')))),
+          ),
+          React.createElement('div', { className: 'qqa-messages' },
+            ...(messages.length ? messages.map((m) => React.createElement('div', { key: m.id, className: 'qqa-msg' + (m.direction === 'ai' ? ' ai' : '') },
+              React.createElement('span', { className: 'qqa-avatar' }, (m.nick || (m.direction === 'ai' ? 'AI' : '友')).slice(0, 1)),
+              React.createElement('div', null,
+                React.createElement('span', { className: 'qqa-meta' }, (m.nick || (m.direction === 'ai' ? 'AI' : '成员')) + ' · ' + fmtTime(m.ts)),
+                React.createElement('div', { className: 'qqa-bubble' }, m.text || '（附件）'),
+              ),
+            )) : [React.createElement('div', { className: 'qqa-chat-empty', key: 'empty' }, '选择左侧会话查看消息')]),
+            ...failures.slice(0, 3).map((l) => React.createElement('div', { className: 'qqa-msg error ai', key: 'failure-' + l.id },
+              React.createElement('span', { className: 'qqa-avatar' }, '!'),
+              React.createElement('div', null,
+                React.createElement('span', { className: 'qqa-meta' }, 'AI · 失败'),
+                React.createElement('div', { className: 'qqa-bubble' }, '回复失败：' + (l.reason || 'DSH Agent 暂时不可用') + '。未发送到 QQ。'),
+              ),
+            )),
+          ),
+        ),
       );
     }
 
     function DetailPanel({ status, logs, sessions, onRefresh, onToggleMaster,
       serviceBusy, serviceNote, allServicesOn, onToggleService, onRestartService, catalog,
-      onSelectModel, onSelectAgent, onSelectWorkspace, onOpenLogin, onSaveSessionBinding, onClose }) {
-      const lampLabel = (ok) => React.createElement('span', { className: 'dot ' + (ok ? 'ok' : 'bad') });
+      onOpenLogin, onSaveSessionBinding, onToggleSessionAuto, onDeleteSessionBinding, onClose }) {
+      const allOk = !!(status && status.onebot_connected && status.onebot_login && status.llm_configured && status.dsh_online);
       return React.createElement('div', { className: 'qqa-panel', role: 'dialog', 'aria-label': 'QQ 自动回复控制面板' },
-          React.createElement('div', { className: 'qqa-panel-header' },
-            React.createElement('div', { className: 'qqa-panel-title' }, 'QQ 自动回复'),
-            React.createElement('div', { className: 'qqa-panel-actions' },
-              React.createElement('button', { type: 'button', className: 'qqa-icon-button', title: '刷新', 'aria-label': '刷新', onClick: onRefresh },
-                React.createElement(Primitives.IconRefreshOutline16, { size: 16 })),
-              React.createElement('button', { type: 'button', className: 'qqa-icon-button', title: '关闭', 'aria-label': '关闭', onClick: onClose },
-                React.createElement(Primitives.IconCloseOutline16, { size: 16 })),
-            ),
-          ),
-        // 状态
+        React.createElement('div', { className: 'qqa-topbar' },
+          React.createElement('div', { className: 'qqa-topbar-title' },
+            React.createElement('span', { className: 'qqa-brand-icon' }, 'QQ'),
+            React.createElement('span', null, 'QQ 自动回复')),
+          React.createElement('div', { className: 'qqa-topbar-status' },
+            React.createElement('span', { className: 'dot ' + (allOk ? 'ok' : 'bad') }),
+            React.createElement('span', null, allOk ? '运行中' : '异常')),
+          React.createElement('div', { className: 'spacer' }),
+          React.createElement('button', { type: 'button', className: 'qqa-icon-button', title: '刷新', 'aria-label': '刷新', onClick: onRefresh },
+            React.createElement(Primitives.IconRefreshOutline16, { size: 16 })),
+          React.createElement('button', { type: 'button', className: 'qqa-icon-button', title: '关闭', 'aria-label': '关闭', onClick: onClose },
+            React.createElement(Primitives.IconCloseOutline16, { size: 16 })),
+        ),
         React.createElement('h4', null, '运行状态'),
         React.createElement('div', { className: 'qqa-grid' },
-          React.createElement('div', { className: 'qqa-kv' },
-            React.createElement('span', null, 'OneBot 连接'), React.createElement('b', null,
-              React.createElement('span', { className: 'dot ' + (status && status.onebot_connected ? 'ok' : 'bad') }),
-              (status && status.onebot_connected ? ' 在线' : ' 离线'))),
-          React.createElement('div', { className: 'qqa-kv' },
-            React.createElement('span', null, 'QQ 登录'), React.createElement('b', null,
-              React.createElement('span', { className: 'dot ' + (status && status.onebot_login ? 'ok' : 'bad') }),
-              (status && status.onebot_login ? ' ✓' : ' ✗'))),
-          React.createElement('div', { className: 'qqa-kv' },
-            React.createElement('span', null, 'DSH 模型'), React.createElement('b', null,
-              React.createElement('span', { className: 'dot ' + (status && status.llm_configured ? 'ok' : 'bad') }),
-              (status ? ' ' + (status.llm_model || '未配置') : ''))),
-          React.createElement('div', { className: 'qqa-kv' },
-            React.createElement('span', null, 'DSH 接入'), React.createElement('b', null,
-              React.createElement('span', { className: 'dot ' + (status && status.dsh_online ? 'ok' : 'bad') }),
-              (status && status.dsh_enabled ? (status.dsh_online ? ' 在线' : ' 离线') : ' 未启用'))),
-        ),
-        // 一键控制：启动/停止 NapCat + 后端 + 总开关
-        React.createElement('h4', null, '一键控制'),
-        React.createElement('div', { className: 'qqa-service' },
-          React.createElement('button', {
-            className: 'qqa-btn-primary' + (allServicesOn ? ' on' : ''),
-            disabled: serviceBusy,
-            onClick: onToggleService,
-          }, serviceBusy ? '服务操作中…' : (allServicesOn ? '停止全部服务' : '一键启动所有服务')),
-          React.createElement('div', { className: 'qqa-note' },
-            serviceNote || (allServicesOn
-              ? (status && !status.llm_configured
-                  ? '服务已启动，但 DSH 模型运行时未就绪，请先选择可用模型'
-                  : 'NapCat、后端与总开关均已就绪')
-              : '启动 NapCat 容器、AutoReply 后端并打开总开关')),
-            React.createElement('button', { className: 'qqa-btn-primary', disabled: serviceBusy, onClick: onRestartService },
-              serviceBusy ? '操作中…' : '重启后端'),
-        React.createElement('div', { className: 'qqa-section' },
-          React.createElement('h4', null, 'DSH 运行配置'),
-          React.createElement('div', { className: 'qqa-field' },
-            React.createElement('label', null, '模型服务 / 模型'),
-            React.createElement('select', { className: 'qqa-select', value: catalog.selectedModel, onChange: (e) => onSelectModel(e.target.value) },
-              React.createElement('option', { value: '' }, '使用当前 AutoReply 模型'),
-              ...catalog.models.map((m) => React.createElement('option', { key: m.value, value: m.value }, m.label)),
-            ),
-          ),
-          React.createElement('div', { className: 'qqa-field' },
-            React.createElement('label', null, 'Agent 预设'),
-            React.createElement('select', { className: 'qqa-select', value: catalog.selectedAgent, onChange: (e) => onSelectAgent(e.target.value) },
-              React.createElement('option', { value: '' }, '使用当前人设'),
-              ...catalog.agents.map((a) => React.createElement('option', { key: a.id, value: a.id }, a.label)),
-            ),
-          ),
-          React.createElement('div', { className: 'qqa-field' },
-            React.createElement('label', null, '工作区'),
-            React.createElement('select', { className: 'qqa-select', value: catalog.selectedWorkspace, onChange: (e) => onSelectWorkspace(e.target.value) },
-              React.createElement('option', { value: '' }, '使用当前工作区'),
-              ...catalog.workspaces.map((w) => React.createElement('option', { key: w.id, value: w.id }, w.label)),
-            ),
-          ),
-          React.createElement('div', { className: 'qqa-note' }, catalog.note || '选择项会保存到 DSH 插件设置。'),
+          React.createElement('div', { className: 'qqa-kv' }, React.createElement('span', null, 'OneBot 连接'), React.createElement('b', null, React.createElement('span', { className: 'dot ' + (status && status.onebot_connected ? 'ok' : 'bad') }), status && status.onebot_connected ? ' 在线' : ' 离线')),
+          React.createElement('div', { className: 'qqa-kv' }, React.createElement('span', null, 'QQ 登录'), React.createElement('b', null, React.createElement('span', { className: 'dot ' + (status && status.onebot_login ? 'ok' : 'bad') }), status && status.onebot_login ? ' ✓' : ' ✗')),
+          React.createElement('div', { className: 'qqa-kv' }, React.createElement('span', null, 'DSH 模型'), React.createElement('b', null, React.createElement('span', { className: 'dot ' + (status && status.llm_configured ? 'ok' : 'bad') }), status ? ' ' + (status.llm_model || '未配置') : '')),
+          React.createElement('div', { className: 'qqa-kv' }, React.createElement('span', null, 'DSH 接入'), React.createElement('b', null, React.createElement('span', { className: 'dot ' + (status && status.dsh_online ? 'ok' : 'bad') }), status && status.dsh_enabled ? (status.dsh_online ? ' 在线' : ' 离线') : ' 未启用')),
         ),
         React.createElement('div', { className: 'qqa-section' },
           React.createElement('h4', null, 'QQ 登录'),
-          React.createElement('button', { className: 'qqa-btn-primary', onClick: onOpenLogin },
-            status && status.onebot_login ? '打开 NapCat 登录管理' : '打开 QQ 扫码登录'),
-          React.createElement('div', { className: 'qqa-note' }, '二维码由 NapCat WebUI 提供，登录状态会自动刷新。'),
           React.createElement('iframe', { className: 'qqa-login-frame', src: 'http://127.0.0.1:6099/webui/', title: 'NapCat QQ 扫码登录' }),
+          React.createElement('div', { className: 'qqa-login-actions' },
+            React.createElement('button', { className: 'qqa-btn', disabled: serviceBusy, onClick: onToggleService }, serviceBusy ? '操作中…' : (allServicesOn ? '停止服务' : '启动服务')),
+            React.createElement('button', { className: 'qqa-btn', disabled: serviceBusy, onClick: onRestartService }, serviceBusy ? '操作中…' : '重启服务'),
+            React.createElement('button', { className: 'qqa-btn', onClick: onOpenLogin }, status && status.onebot_login ? '打开 NapCat 登录管理' : '打开 QQ 扫码登录'),
+          ),
         ),
-        ),
-        // 总开关
         React.createElement('h4', null, '总开关'),
         React.createElement('label', { className: 'qqa-toggle' },
           React.createElement('input', { type: 'checkbox', checked: status ? !!status.master_switch : false, onChange: (e) => onToggleMaster(e.target.checked) }),
           React.createElement('span', { className: 'tknob' }),
           React.createElement('span', null, status && status.master_switch ? '自动回复 开' : '自动回复 关'),
         ),
-// 回复规则
         React.createElement(RulesSection, null),
         React.createElement(ChatSection, { sessions, logs }),
-        React.createElement(SessionBindingEditor, { sessions, agents: catalog.agents, workspaces: catalog.workspaces, models: catalog.models, onSave: onSaveSessionBinding }),
+        React.createElement(SessionBindingEditor, { sessions, agents: catalog.agents, workspaces: catalog.workspaces, models: catalog.models, onSave: onSaveSessionBinding, onToggleAuto: onToggleSessionAuto, onDeleteBinding: onDeleteSessionBinding }),
       );
     }
 
@@ -576,6 +589,20 @@ useEffect(() => {
         refresh();
       }, [refresh]);
 
+      const toggleSessionAuto = useCallback(async (chatKey, autoOn) => {
+        try {
+          await arExec('session_auto', { chat_key: chatKey, auto_on: autoOn });
+          refresh();
+        } catch (e) { setErr(String(e.message || e)); }
+      }, [refresh]);
+
+      const deleteSessionBinding = useCallback(async (chatKey) => {
+        try {
+          await arExec('session_binding', { chat_key: chatKey, agent_preset: '', model_provider: '', model_name: '', workspace_dir: '', session_dir: '', dsh_session_id: '' });
+          refresh();
+        } catch (e) { setErr(String(e.message || e)); }
+      }, [refresh]);
+
       const togglePanel = useCallback(() => {
         setStore((s) => ({ ...s, panelOpen: !s.panelOpen }));
       }, []);
@@ -587,11 +614,10 @@ useEffect(() => {
           onRefresh: refresh, onToggleMaster: toggleMaster,
           serviceBusy: service.busy, serviceNote: service.note,
           allServicesOn, onToggleService: toggleService, onRestartService: restartService, catalog,
-          onSelectModel: (v) => selectDshValue('model', v),
-          onSelectAgent: (v) => selectDshValue('agent', v),
-          onSelectWorkspace: (v) => selectDshValue('workspace', v),
           onOpenLogin: openLogin,
             onSaveSessionBinding: saveSessionBinding,
+            onToggleSessionAuto: toggleSessionAuto,
+            onDeleteSessionBinding: deleteSessionBinding,
             onClose: () => setStore((s) => ({ ...s, panelOpen: false })),
         }) : null,
       );
