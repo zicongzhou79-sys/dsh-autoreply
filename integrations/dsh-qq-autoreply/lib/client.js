@@ -339,11 +339,16 @@ function RulesSection() {
     }
 
     function ChatSection({ sessions, logs }) {
-      const list = sessions || [];
+      // 模拟聊天只展示已绑定 DSH Session 的会话；删除绑定时自动从列表移除。
+      const list = (sessions || []).filter((s) => s.dsh_session_id);
       const [chatKey, setChatKey] = React.useState('');
       const [messages, setMessages] = React.useState([]);
       const [visibleCount, setVisibleCount] = React.useState(20);
-      React.useEffect(() => { if (!chatKey && list[0]) setChatKey(list[0].chat_key); }, [chatKey, list]);
+      React.useEffect(() => {
+        if (chatKey && list.some((s) => s.chat_key === chatKey)) return;
+        setChatKey(list[0] ? list[0].chat_key : '');
+        setMessages([]);
+      }, [chatKey, list]);
       React.useEffect(() => {
         setVisibleCount(20);
         if (!chatKey) return;
@@ -366,7 +371,7 @@ function RulesSection() {
                 React.createElement('span', { className: 'qqa-meta' }, (m.nick || (m.direction === 'ai' ? 'AI' : '成员')) + ' · ' + fmtTime(m.ts)),
                 React.createElement('div', { className: 'qqa-bubble' }, m.text || '（附件）'),
               ),
-            )) : [React.createElement('div', { className: 'qqa-chat-empty', key: 'empty' }, '选择左侧会话查看消息')]),
+            )) : [React.createElement('div', { className: 'qqa-chat-empty', key: 'empty' }, list.length ? '暂无消息' : '暂无已绑定会话，请先在会话绑定中添加')]),
             ...failures.slice(0, 3).map((l) => React.createElement('div', { className: 'qqa-msg error ai', key: 'failure-' + l.id },
               React.createElement('span', { className: 'qqa-avatar' }, '!'),
               React.createElement('div', null,
