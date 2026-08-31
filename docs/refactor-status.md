@@ -30,6 +30,7 @@
 - [x] 会话绑定支持 Agent preset、模型、Workspace、Session ID。
 - [x] DSH 页面可见 `QQ 自动回复` 入口。
 - [x] 通过只读浏览器脚本提取页面正文，确认入口文本存在于当前 DSH Web 页面。
+- [x] 修复点击“QQ 自动回复”后 `agent is not defined` 导致组件崩溃、按钮消失的问题。
 
 ## 2. 自动验证证据
 
@@ -59,8 +60,7 @@ AutoReply Python DSHClient session_chat
 
 ## 3. 剩余人工/运维项
 
-- [ ] 人工打开 DSH `QQ 自动回复` 面板，核对整体布局、按钮位置和移动端表现是否与 `frontend-demo/index.html` 一致。
-- [ ] 轮换 NapCat 配置中的旧 token，并同步 `backend/config.yaml`。
+- [ ] 刷新 DSH Web 后人工确认点击“QQ 自动回复”可以正常打开控制面板。
 
 ## 4. 关键提交
 
