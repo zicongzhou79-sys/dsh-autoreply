@@ -588,11 +588,10 @@ useEffect(() => {
       }, [refresh, service.busy]);
 
       const saveSessionBinding = useCallback(async (body) => {
-        let dshSessionId = body.dsh_session_id || '';
-        if (!dshSessionId) {
-          const d = await jsonPost('/dsh-qq/session', { action: 'create', chat_key: body.chat_key });
-          dshSessionId = d && d.result && d.result.session ? d.result.session.id : '';
-        }
+        // 只要绑定表单指定了工作区，就创建新的 DSH Session，
+        // 确保会话落在当前工作区，而不是继续使用旧的未分组/旧 cwd 会话。
+        const d = await jsonPost('/dsh-qq/session', { action: 'create', chat_key: body.chat_key, ...(body.workspace_dir ? { workspace_id: body.workspace_dir } : {}) });
+        const dshSessionId = d && d.result && d.result.session ? d.result.session.id : '';
         await arExec('session_binding', { ...body, dsh_session_id: dshSessionId });
         refresh();
       }, [refresh]);
