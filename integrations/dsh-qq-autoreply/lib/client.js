@@ -133,6 +133,8 @@ window.__ModuleLoader__.load({
 .qqa-note { font-size: 11px; color: var(--dsw-alias-label-secondary, #8a8f98);
   word-break: break-word; line-height: 1.45; }
   .qqa-section { border-top: 1px solid var(--dsw-alias-border-l1, rgba(128,128,128,.15)); padding-top: 8px; margin-top: 8px; }
+  .qqa-section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .qqa-section-head h4 { margin: 0; }
   .qqa-field { display: flex; flex-direction: column; gap: 4px; margin: 6px 0; }
   .qqa-field label { color: var(--dsw-alias-label-secondary, #8a8f98); font-size: 11px; }
   .qqa-select { width: 100%; box-sizing: border-box; padding: 6px 8px; border-radius: 6px;
@@ -186,6 +188,112 @@ window.__ModuleLoader__.load({
       const d = new Date(ts * 1000);
       const p = (n) => String(n).padStart(2, '0');
       return p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+    }
+
+    // ---- DSH catalog readers -------------------------------------------------
+    // 当前 DSH 的客户端 API：api-gateway 把 host 的 remote 命名空间注册为
+    // `remote.session` / `remote.agentPresets` 服务，调用直接返回 {ok,value} /
+    // {ok:false,error}；工作区走 `workspaces` 服务的 list 快照。
+    // 历史版本插件用的是 connection.api.*（返回 {result:{ok,value}}），
+    // 下面统一解包，两种形态都能读。
+    const unwrapRemote = (response) => {
+      if (response === undefined || response === null) return null;
+      const payload = (typeof response === 'object' && response.ok === undefined && response.result !== undefined)
+        ? response.result : response;
+      if (payload && payload.ok === true) return payload.value === undefined ? null : payload.value;
+      if (payload && payload.ok === false) {
+        const err = payload.error || {};
+        throw new Error(err.message || err.code || 'DSH 调用失败');
+      }
+      return payload;
+    };
+
+    /** 取 remote 命名空间服务（未注册时返回 null，不抛错）。 */
+    const readRemoteNamespace = (ctx, name) => {
+      if (!ctx) return null;
+      try {
+        const direct = typeof ctx.get === 'function' ? ctx.get('remote.' + name) : null;
+        if (direct) return direct;
+      } catch (_) { /* 命名空间未注册时继续尝试聚合对象 */ }
+      try {
+        const remote = (typeof ctx.get === 'function' ? ctx.get('remote') : null) || ctx.remote || null;
+        if (remote && remote[name]) return remote[name];
+      } catch (_) { /* 同上 */ }
+      return null;
+    };
+
+    /** 取工作区快照条目；服务不可用时返回 null（区别于空列表）。 */
+    const readWorkspaceItems = (ctx) => {
+      try {
+        const service = typeof ctx.get === 'function' ? ctx.get('workspaces') : null;
+        if (service && service.list && typeof service.list.getSnapshot === 'function') {
+          const snapshot = service.list.getSnapshot() || {};
+          return snapshot.items || [];
+        }
+      } catch (_) { /* 旧版 DSH 无 workspaces 服务 */ }
+      return null;
+    };
+
+    const mapWorkspaces = (items) => (items || []).map((w) => ({
+      id: w.workspaceId || w.id,
+      path: w.path,
+      label: w.title || w.path || w.workspaceId || w.id,
+    }));
+
+    /**
+     * 读取 DSH 的模型 / Agent preset / 工作区目录。
+     * @param ctx - 插件客户端 Context（用于 remote.* 与 workspaces 服务）。
+     * @param legacyApi - 旧版 connection.api 对象，可为 undefined。
+     * @returns {Promise<{models:Array,agents:Array,workspaces:Array,note:string}>}
+     */
+    async function readDshCatalog(ctx, legacyApi) {
+      const safe = async (fn) => { try { return await fn(); } catch (_) { return null; } };
+      const callRemote = async (namespace, method, args) => {
+        const ns = readRemoteNamespace(ctx, namespace);
+        if (!ns || typeof ns[method] !== 'function') return null;
+        return unwrapRemote(args === undefined ? await ns[method]() : await ns[method](...args));
+      };
+      const callLegacy = async (namespace, method, args) => {
+        const ns = legacyApi && legacyApi[namespace];
+        if (!ns || typeof ns[method] !== 'function') return null;
+        // connection.api.* 的返回是 {result:{ok,value}}，由 unwrapRemote 兼容。
+        return unwrapRemote(await ns[method](...(args || [{}])));
+      };
+
+      const modelValue = await safe(async () => (await callRemote('session', 'modelCatalog'))
+        || (await callLegacy('session', 'modelCatalog')));
+      const presetValue = await safe(async () => (await callRemote('agentPresets', 'list'))
+        || (await callLegacy('agentPresets', 'list')));
+
+      const models = (((modelValue && modelValue.groups) || [])).flatMap((g) => ((g && g.models) || []).map((m) => ({
+        value: `${g.id}:${m.id}`, label: `${g.name || g.id} / ${m.name || m.id}`,
+      })));
+      const presetRows = (presetValue && presetValue.presets) || (Array.isArray(presetValue) ? presetValue : []);
+      const agents = presetRows.filter((a) => a && !a.broken).map((a) => ({
+        id: a.id, label: a.name || a.id,
+      }));
+
+      let workspaces = null;
+      for (let i = 0; i < 5; i++) {
+        workspaces = readWorkspaceItems(ctx);
+        if (workspaces && workspaces.length) break;
+        if (workspaces === null) break;               // 服务不存在，不必等待
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+      if (!workspaces || !workspaces.length) {
+        const legacyValue = await safe(() => callLegacy('workspace', 'list'));
+        if (legacyValue && legacyValue.items && legacyValue.items.length) workspaces = legacyValue.items;
+      }
+
+      const notes = [];
+      if (!models.length) notes.push('未读取到模型目录');
+      if (!agents.length) notes.push('未读取到 Agent preset');
+      return {
+        models,
+        agents,
+        workspaces: mapWorkspaces(workspaces),
+        note: (models.length || agents.length) ? '' : notes.join('；'),
+      };
     }
 
     // ---- Status Bar (composer dock) ----
@@ -385,9 +493,46 @@ function RulesSection() {
       );
     }
 
+    // ---- DSH 配置区：全局模型 / Agent preset / 工作区选择 ----
+    // 选择写入 AutoReply 的配置覆盖层（llm.provider+model / engine.dsh.agent_preset /
+    // engine.workspace_dir），未单独绑定 DSH 会话的 QQ 会话都用这套全局配置。
+    function DshConfigSection({ catalog, status, onSelect, onReload }) {
+      const models = catalog.models || [];
+      const agents = catalog.agents || [];
+      const workspaces = catalog.workspaces || [];
+      const select = (kind, value, options, emptyLabel) => React.createElement('select', {
+        className: 'qqa-select', value: value || '', onChange: (e) => onSelect(kind, e.target.value),
+      },
+        React.createElement('option', { value: '' }, emptyLabel),
+        ...options);
+      const withCurrent = (options, current, prefix) => {
+        if (!current || options.some((o) => o.key === current)) return options;
+        return [React.createElement('option', { key: 'current', value: current }, prefix + current), ...options];
+      };
+      const modelOptions = withCurrent(models.map((m) => React.createElement('option', { key: m.value, value: m.value }, m.label)), catalog.selectedModel, '当前：');
+      const agentOptions = withCurrent(agents.map((a) => React.createElement('option', { key: a.id, value: a.id }, a.label)), catalog.selectedAgent, '当前：');
+      const workspaceOptions = withCurrent(workspaces.map((w) => React.createElement('option', { key: w.id || w.path, value: w.path }, w.label)), catalog.selectedWorkspace, '当前：');
+      return React.createElement('div', { className: 'qqa-section' },
+        React.createElement('div', { className: 'qqa-section-head' },
+          React.createElement('h4', null, 'DSH 配置'),
+          React.createElement('button', { type: 'button', className: 'qqa-mini', onClick: onReload }, '刷新目录')),
+        React.createElement('div', { className: 'qqa-field' },
+          React.createElement('label', null, '模型' + (status && status.llm_model ? '（当前 ' + status.llm_model + '）' : '')),
+          select('model', catalog.selectedModel, modelOptions, models.length ? '选择 DSH 模型' : '未读取到模型目录')),
+        React.createElement('div', { className: 'qqa-field' },
+          React.createElement('label', null, 'Agent preset'),
+          select('agent', catalog.selectedAgent, agentOptions, agents.length ? '选择 Agent preset（默认人设）' : '未读取到 Agent preset')),
+        React.createElement('div', { className: 'qqa-field' },
+          React.createElement('label', null, '工作区'),
+          select('workspace', catalog.selectedWorkspace, workspaceOptions, workspaces.length ? '使用 DSH 默认目录' : '未读取到工作区')),
+        catalog.note ? React.createElement('div', { className: 'qqa-note' }, catalog.note) : null,
+      );
+    }
+
     function DetailPanel({ status, logs, sessions, onRefresh, onToggleMaster,
       serviceBusy, serviceNote, allServicesOn, onToggleService, onRestartService, catalog,
-      onOpenLogin, onSaveSessionBinding, onToggleSessionAuto, onDeleteSessionBinding, onClose }) {
+      onOpenLogin, onSaveSessionBinding, onToggleSessionAuto, onDeleteSessionBinding,
+      onSelectDsh, onReloadCatalog, onClose }) {
       const allOk = !!(status && status.onebot_connected && status.onebot_login && status.llm_configured && status.dsh_online);
       return React.createElement('div', { className: 'qqa-panel', role: 'dialog', 'aria-label': 'QQ 自动回复控制面板' },
         React.createElement('div', { className: 'qqa-topbar' },
@@ -417,13 +562,14 @@ function RulesSection() {
             React.createElement('button', { className: 'qqa-btn', onClick: onOpenLogin }, status && status.onebot_login ? '打开 NapCat 登录管理' : '打开 QQ 扫码登录'),
           ),
         ),
+        React.createElement(DshConfigSection, { catalog, status, onSelect: onSelectDsh, onReload: onReloadCatalog }),
         React.createElement(SessionBindingEditor, { sessions, agents: catalog.agents, workspaces: catalog.workspaces, models: catalog.models, onSave: onSaveSessionBinding, onToggleAuto: onToggleSessionAuto, onDeleteBinding: onDeleteSessionBinding }),
         React.createElement(RulesSection, null),
         React.createElement(ChatSection, { sessions, logs }),
       );
     }
 
-    const inject = ['slots', 'connection'];
+    const inject = ['slots', 'connection', 'workspaces', 'remote'];
     function apply(ctx) {
       const slots = ctx.get('slots');
         const connection = ctx.get('connection');
@@ -445,71 +591,119 @@ function RulesSection() {
       const [service, setService] = React.useState({ busy: false, note: '' });
 
         const [catalog, setCatalog] = React.useState({ models: [], agents: [], workspaces: [], selectedModel: '', selectedAgent: '', selectedWorkspace: '', note: '' });
-        const dshApi = connection.api;
+        // 旧版 DSH 的 connection.api（当前版本 connection 服务没有 api 字段，因此为 undefined）；
+        // 仅作为 readDshCatalog 的历史兜底通道。
+        const dshApi = connection && connection.api ? connection.api : undefined;
+
+        const applyCatalog = useCallback((result) => {
+          const models = (result && result.models) || [];
+          const agents = (result && result.agents) || [];
+          const workspaces = (result && result.workspaces) || [];
+          setCatalog((old) => ({
+            ...old, models, agents, workspaces, note: (result && result.note) || '',
+          }));
+          return models.length + agents.length + workspaces.length;
+        }, []);
+
+        // 用后端真实配置回填选择器，避免显示与生效配置不一致。
+        const syncSelectionFromConfig = useCallback(async () => {
+          try {
+            const cfg = await arExec('config_get');
+            const c = (cfg && cfg.config) || {};
+            const provider = (c.llm && c.llm.provider) || '';
+            const model = (c.llm && c.llm.model) || '';
+            const preset = (c.engine && c.engine.dsh && c.engine.dsh.agent_preset) || '';
+            const workspaceDir = (c.engine && c.engine.workspace_dir) || '';
+            setCatalog((old) => ({
+              ...old,
+              selectedModel: provider && model ? `${provider}:${model}` : '',
+              selectedAgent: preset,
+              selectedWorkspace: workspaceDir,
+            }));
+          } catch (_) { /* 后端暂不可达时保留上次选择 */ }
+        }, []);
 
         const loadDshCatalog = useCallback(async () => {
-          try {
-            const [modelsResponse, agentsResponse, workspacesResponse] = await Promise.all([
-              dshApi.llm.models({}), dshApi.agentPresets.list({}), dshApi.workspace.list({}),
-            ]);
-            const modelValue = modelsResponse.result && modelsResponse.result.ok ? modelsResponse.result.value : { groups: [] };
-            const models = (modelValue.groups || []).flatMap((g) => (g.models || []).map((m) => ({
-              value: `${g.id}:${m.id}`, label: `${g.name || g.id} / ${m.name || m.id}`,
-            })));
-            const agentValue = agentsResponse.result && agentsResponse.result.ok ? agentsResponse.result.value : {};
-            const agents = (agentValue.presets || agentValue.items || []).filter((a) => !a.broken).map((a) => ({
-              id: a.id, label: a.name || a.id,
-            }));
-            const workspaceValue = workspacesResponse.result && workspacesResponse.result.ok ? workspacesResponse.result.value : {};
-            const workspaces = (workspaceValue.items || []).map((w) => ({
-              id: w.workspaceId || w.id, path: w.path, label: w.title || w.path || w.workspaceId || w.id,
-            }));
-            setCatalog((old) => ({ ...old, models, agents, workspaces, selectedModel: localStorage.getItem('dsh-qq-autoreply.model') || '', selectedAgent: localStorage.getItem('dsh-qq-autoreply.agent') || '', selectedWorkspace: localStorage.getItem('dsh-qq-autoreply.workspace') || '', note: '' }));
-          } catch (e) {
-            setCatalog((old) => ({ ...old, note: `DSH 配置读取失败：${String(e.message || e)}` }));
+          // remote 命名空间服务与工作区快照都可能晚于面板挂载就绪，
+          // 空结果时重试几轮，避免首次读不到就判定失败。
+          let result = null;
+          for (let attempt = 0; attempt < 6; attempt++) {
+            const read = await readDshCatalog(ctx, dshApi);
+            result = read;
+            if (read && (read.models.length || read.agents.length || read.workspaces.length)) break;
+            await new Promise((resolve) => setTimeout(resolve, 400));
           }
-        }, [dshApi]);
+          const found = applyCatalog(result);
+          if (!found) {
+            setCatalog((old) => ({
+              ...old,
+              note: (result && result.note) || '未能从 DSH 读取模型/Agent preset 目录，请确认 DSH 已连接后点「刷新目录」',
+            }));
+          }
+          await syncSelectionFromConfig();
+        }, [applyCatalog, syncSelectionFromConfig, dshApi]);
 
         useEffect(() => { loadDshCatalog(); }, [loadDshCatalog]);
 
         const selectDshValue = useCallback(async (kind, value) => {
           const key = `dsh-qq-autoreply.${kind}`;
           if (value) localStorage.setItem(key, value); else localStorage.removeItem(key);
-          setCatalog((old) => ({ ...old, [kind === 'model' ? 'selectedModel' : kind === 'agent' ? 'selectedAgent' : 'selectedWorkspace']: value }));
-          if (kind === 'model' && value) {
-            const model = value.split(':').slice(1).join(':');
-            const provider = value.split(':')[0];
-            try { await arExec('config_set', { batch: { 'llm.provider': provider, 'llm.model': model, 'engine.dsh.enabled': true, 'engine.dsh.base_url': 'http://127.0.0.1:3081' } }); } catch (e) { setErr(String(e.message || e)); }
-          }
-          if (kind === 'agent' && value) {
-            try {
-              const response = await dshApi.agentPresets.read({ agentPreset: value });
-              if (response.result && response.result.ok) {
-                  const content = response.result.value.content;
-                  const prompt = typeof content === 'string' ? content : JSON.stringify(content || {});
-                  const info = await arExec('agent_info', { agent_preset: value, preset_content: content });
-                  const tools = (info && info.tools) || [];
-                  setCatalog((old) => ({ ...old, agentTools: tools }));
-                  await arExec('config_set', { batch: {
-                    'persona.system_prompt': prompt,
-                    'engine.dsh.agent_preset': value,
-                    'engine.dsh.reply_tools': tools.map((t) => t.id),
-                  } });
-                }
-            } catch (e) { setErr(String(e.message || e)); }
-          }
-          if (kind === 'workspace' && value) {
-            const workspace = catalog.workspaces.find((w) => w.id === value);
-            if (workspace && workspace.path) {
-              try {
-                await arExec('config_set', { batch: {
-                  'engine.workspace_dir': workspace.path,
-                  'engine.session_dir': `${workspace.path}/.dsh/qq-autoreply`,
-                } });
-              } catch (e) { setErr(String(e.message || e)); }
+          const stateKey = kind === 'model' ? 'selectedModel' : kind === 'agent' ? 'selectedAgent' : 'selectedWorkspace';
+          setCatalog((old) => ({ ...old, [stateKey]: value, note: '' }));
+          try {
+            if (kind === 'model') {
+              if (!value) return;
+              const provider = value.split(':')[0];
+              const model = value.split(':').slice(1).join(':');
+              // base_url 跟随当前 DSH web 的来源端口，禁止写死（此前硬编码 3081 导致
+              // AutoReply 连不上 DSH：ConnectError: All connection attempts failed）
+              await arExec('config_set', { batch: {
+                'llm.provider': provider, 'llm.model': model,
+                'engine.dsh.enabled': true, 'engine.dsh.base_url': window.location.origin,
+              } });
+              setCatalog((old) => ({ ...old, note: `已选择模型 ${provider} / ${model}` }));
             }
+            if (kind === 'agent') {
+              if (!value) {
+                await arExec('config_set', { batch: { 'engine.dsh.agent_preset': '', 'engine.dsh.reply_tools': [] } });
+                setCatalog((old) => ({ ...old, agentTools: [], note: '已清除 Agent preset，使用 DSH 默认' }));
+                return;
+              }
+              // remote.agentPresets.read 的参数是 preset id 字符串（旧版传对象会被拒）。
+              const presetNs = readRemoteNamespace(ctx, 'agentPresets');
+              let content = '';
+              let presetName = value;
+              if (presetNs && typeof presetNs.read === 'function') {
+                const doc = unwrapRemote(await presetNs.read(value));
+                if (doc) { content = doc.content || ''; presetName = doc.name || value; }
+              }
+              const info = await arExec('agent_info', { agent_preset: value, preset_content: content });
+              const tools = (info && info.tools) || [];
+              await arExec('config_set', { batch: {
+                'persona.system_prompt': typeof content === 'string' ? content : JSON.stringify(content || {}),
+                'engine.dsh.agent_preset': value,
+                'engine.dsh.reply_tools': tools.map((t) => t.id),
+              } });
+              setCatalog((old) => ({ ...old, agentTools: tools, note: `已选择 Agent preset：${presetName}` }));
+            }
+            if (kind === 'workspace') {
+              if (!value) {
+                await arExec('config_set', { batch: { 'engine.workspace_dir': '', 'engine.session_dir': '' } });
+                setCatalog((old) => ({ ...old, note: '已恢复 DSH 默认工作区' }));
+                return;
+              }
+              const workspace = (catalog.workspaces || []).find((w) => w.path === value || w.id === value);
+              const dir = (workspace && workspace.path) || value;
+              await arExec('config_set', { batch: {
+                'engine.workspace_dir': dir,
+                'engine.session_dir': `${dir}/.dsh/qq-autoreply`,
+              } });
+              setCatalog((old) => ({ ...old, note: `已选择工作区：${dir}` }));
+            }
+          } catch (e) {
+            setCatalog((old) => ({ ...old, note: `保存失败：${String(e.message || e)}` }));
           }
-        }, []);
+        }, [catalog.workspaces]);
 
         const openLogin = useCallback(() => {
           window.open('http://127.0.0.1:6099/webui/', '_blank', 'noopener,noreferrer');
@@ -595,18 +789,24 @@ useEffect(() => {
       const saveSessionBinding = useCallback(async (body) => {
         // 只要绑定表单指定了工作区，就创建新的 DSH Session，
         // 确保会话落在当前工作区，而不是继续使用旧的未分组/旧 cwd 会话。
+        // 模型参数必须带上：绑定表单未选时回退「DSH 配置」区的全局选择，
+        // 否则新建的 agent 没有模型绑定，聊天时报
+        // `prompt variable "{{model}}" has no value` → "DSH Agent 未产生回复"。
+        const fallback = catalog.selectedModel || localStorage.getItem('dsh-qq-autoreply.model') || '';
+        const provider = body.model_provider || (fallback ? fallback.split(':')[0] : '');
+        const modelName = body.model_name || (fallback ? fallback.split(':').slice(1).join(':') : '');
         const d = await jsonPost('/dsh-qq/session', {
           action: 'create',
           chat_key: body.chat_key,
           ...(body.workspace_dir ? { workspace_id: body.workspace_dir } : {}),
           ...(body.agent_preset ? { agent_preset: body.agent_preset } : {}),
-          ...(body.model_provider ? { provider: body.model_provider } : {}),
-          ...(body.model_name ? { model: body.model_name } : {}),
+          ...(provider ? { provider } : {}),
+          ...(modelName ? { model: modelName } : {}),
         });
         const dshSessionId = d && d.result && d.result.session ? d.result.session.id : '';
         await arExec('session_binding', { ...body, dsh_session_id: dshSessionId });
         refresh();
-      }, [refresh]);
+      }, [refresh, catalog]);
 
       const toggleSessionAuto = useCallback(async (chatKey, autoOn) => {
         try {
@@ -623,8 +823,12 @@ useEffect(() => {
       }, [refresh]);
 
       const togglePanel = useCallback(() => {
-        setStore((s) => ({ ...s, panelOpen: !s.panelOpen }));
-      }, []);
+        setStore((s) => {
+          // 首次打开面板时刷新目录与当前配置（命名空间服务可能此时才就绪）。
+          if (!s.panelOpen) { loadDshCatalog(); }
+          return { ...s, panelOpen: !s.panelOpen };
+        });
+      }, [loadDshCatalog]);
 
       return React.createElement(React.Fragment, null,
         React.createElement(StatusBar, { wide, onTogglePanel: togglePanel }),
@@ -637,6 +841,8 @@ useEffect(() => {
             onSaveSessionBinding: saveSessionBinding,
             onToggleSessionAuto: toggleSessionAuto,
             onDeleteSessionBinding: deleteSessionBinding,
+            onSelectDsh: selectDshValue,
+            onReloadCatalog: loadDshCatalog,
             onClose: () => setStore((s) => ({ ...s, panelOpen: false })),
         }) : null,
       );
@@ -650,6 +856,8 @@ useEffect(() => {
 
     exports.apply = apply;
     exports.inject = inject;
+    // 供自测使用（DSH 只读取 apply/inject）：目录解析与配置区渲染的纯函数。
+    exports.__test = { readDshCatalog, unwrapRemote, readRemoteNamespace, readWorkspaceItems, mapWorkspaces, DshConfigSection };
     return module.exports;
   },
 });
