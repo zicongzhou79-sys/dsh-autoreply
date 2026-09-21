@@ -24,7 +24,18 @@ const resolveCwd = (workspaceId) => String(workspaceId || process.cwd() || '').t
 import { request as httpRequest } from 'node:http'
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { admitEncodedImages } from '@deepseek-ai/dsh-attachment'
+
+// @deepseek-ai/dsh-attachment 由 DSH 运行环境提供。本插件以 pnpm `link:` 方式装在
+// profile 之外（integrations/dsh-qq-autoreply），harness 包不在它的解析路径上：一旦
+// 插件 node_modules 里的链接被 prune，静态 import 会让整个插件在加载期直接失败
+// （boot 报 Cannot find package，热挂载失败后退化为重启）。因此改为可选加载，
+// 解析不到时退回 attachments.saveImages 这一公共 API，图片准入语义保持一致。
+let admitEncodedImages = null
+try {
+  ({ admitEncodedImages } = await import('@deepseek-ai/dsh-attachment'))
+} catch {
+  admitEncodedImages = null
+}
 
 
 function makeMessage(input) {
@@ -234,6 +245,24 @@ async function attachSessionToWorkspace(ctx, session) {
   }
 }
 
+/** canonical base64 校验 + 解码，语义与 dsh-attachment 的 admission 一致。 */
+function decodeCanonicalImageBase64(data) {
+  const text = String(data ?? '')
+  const decoded = Buffer.from(text, 'base64')
+  if (!text.length || decoded.toString('base64') !== text) throw new Error('图片不是规范的 base64 数据')
+  return new Uint8Array(decoded)
+}
+
+/** 准入一批 wire 形式图片：优先用 harness 助手，不可用时退回 attachments.saveImages。 */
+async function admitImages(attachments, images) {
+  if (typeof admitEncodedImages === 'function') return admitEncodedImages(attachments, images)
+  return attachments.saveImages(images.map((image) => ({
+    mediaType: image.mediaType,
+    data: decodeCanonicalImageBase64(image.data),
+    ...(image.name === undefined ? {} : { name: image.name }),
+  })))
+}
+
 async function toAgentContent(ctx, content) {
   const textParts = content.filter((part) => part && part.type === 'text')
   const imageParts = content.filter((part) => part && part.type === 'image_url')
@@ -244,11 +273,39 @@ async function toAgentContent(ctx, content) {
     if (!match) throw new Error('图片必须是受支持格式的 base64 Data URL')
     return { mediaType: match[1], data: match[2] }
   })
-  const refs = await admitEncodedImages(ctx.attachments, encoded)
+  const refs = await admitImages(ctx.attachments, encoded)
   return [
     ...textParts,
     ...refs.map((attachment) => ({ type: 'image', attachment })),
   ]
+}
+
+/**
+ * 把 agent 的模型绑定纠正为本次请求指定的 provider/model。
+ * 背景：会话可能由面板/旧版本在不带 provider/model 的情况下创建，复用内存中的
+ * 活 agent 时其 options.model 为空，导致系统提示词装配报
+ * `prompt variable "{{model}}" has no value (deployment:persona-prefix)`、
+ * 本轮无回复（"DSH Agent 未产生回复"）。这里用与 GUI selectModel 相同的
+ * agents.selectForNextRequest 途径在每次回复前自愈。
+ */
+async function rebindAgentModel(ctx, agent, provider, model) {
+  if (!agent || !provider || !model) return
+  try {
+    if (agent.options && agent.options.provider === provider && agent.options.model === model) return
+  } catch { /* options 不可读时继续尝试纠正 */ }
+  if (!ctx.agents || typeof ctx.agents.selectForNextRequest !== 'function') return
+  try {
+    let selection = { provider, model }
+    if (ctx.llm && typeof ctx.llm.resolveCallConfig === 'function') {
+      const resolved = await ctx.llm.resolveCallConfig({ provider, model })
+      selection = {
+        provider: resolved.provider,
+        model: resolved.model,
+        ...(resolved.reasoningEffort ? { reasoningEffort: resolved.reasoningEffort } : {}),
+      }
+    }
+    ctx.agents.selectForNextRequest(agent, selection)
+  } catch { /* 纠正失败不阻塞回复流程，保持原绑定 */ }
 }
 
 async function runSessionTurn(ctx, body) {
@@ -288,6 +345,8 @@ async function runSessionTurn(ctx, body) {
     }
     agent = handle.agent
   }
+  // 自愈：内存复用或 resume 出的 agent 若缺模型绑定，按本次请求纠正
+  await rebindAgentModel(ctx, agent, provider, model)
   await attachSessionToWorkspace(ctx, agent.session)
   const agentContent = await toAgentContent(ctx, messageContent)
   agent.followup(makeMessage({ role: 'user', content: agentContent, source: { kind: 'user' } }))

@@ -48,7 +48,7 @@ node --check integrations/dsh-qq-autoreply/lib/client.js
 运行时验证：
 
 ```text
-GET http://127.0.0.1:3081/dsh-qq/health
+GET http://127.0.0.1:3080/dsh-qq/health
 {"ok":true,"autoreply":true,"plugin":"dsh-qq-autoreply"}
 
 POST /dsh-qq/session chat

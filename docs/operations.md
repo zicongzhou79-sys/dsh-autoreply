@@ -4,7 +4,7 @@
 
 ```bash
 curl http://127.0.0.1:8001/api/status
-curl http://127.0.0.1:3081/dsh-qq/health
+curl http://127.0.0.1:3080/dsh-qq/health
 curl http://127.0.0.1:6099/webui/
 ```
 

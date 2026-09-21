@@ -268,7 +268,7 @@ async def test_engine_disabled_no_dsh_calls_or_reply():
 def test_dsh_cfg_defaults():
     cfg = AppConfig()
     assert cfg.engine.dsh.enabled is True
-    assert cfg.engine.dsh.base_url == "http://127.0.0.1:3081"
+    assert cfg.engine.dsh.base_url == "http://127.0.0.1:3080"
     assert cfg.engine.dsh.reply_tools == []
     assert not hasattr(cfg.llm, "api_key")
     assert not hasattr(cfg.llm, "base_url")

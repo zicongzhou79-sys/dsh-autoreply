@@ -21,3 +21,6 @@ deploy/napcat/data/
 # 前端构建产物（若未来启用）
 frontend/dist/
 frontend/node_modules/
+
+# DSH 插件本地依赖（含指向 harness 包的软链，随机器而异）
+integrations/dsh-qq-autoreply/node_modules/

@@ -49,7 +49,7 @@ class RateLimitCfg(BaseModel):
 class DshCfg(BaseModel):
     """DeepSeek Harness 接入段（DSH 插件互通）。"""
     enabled: bool = True          # 回复和工具调用均通过 DSH
-    base_url: str = "http://127.0.0.1:3081"   # DSH host 地址
+    base_url: str = "http://127.0.0.1:3080"   # DSH web host 地址（须与 dsh web 端口一致）
     health_path: str = "/dsh-qq/health"       # 插件健康探测端点
     tool_path: str = "/dsh-qq/execute"        # 插件工具执行端点（AutoReply→DSH）
     persona_path: str = "/dsh-qq/persona"     # 人设读取端点（DSH→AutoReply 同步用）

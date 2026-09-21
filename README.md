@@ -136,7 +136,7 @@ dsh plugin --profile web add ./integrations/dsh-qq-autoreply
 # 在 WebUI 配置页或直接：
 POST /api/config  {"batch":{
   "engine.dsh.enabled": true,
-  "engine.dsh.base_url": "http://127.0.0.1:3081"   # DSH 后端端口（3080 是 web 前端）
+  "engine.dsh.base_url": "http://127.0.0.1:3080"   # 必须与 `dsh web` 实际端口一致
 }}
 ```
 
@@ -169,7 +169,7 @@ POST /api/config  {"batch":{
 | engine.rate_limit | per_session_per_min | 每会话每分钟 AI 回复上限 |
 | engine.context_n | - | 喂给 LLM 的历史条数 |
 | engine.sensitive_words | - | 入站和出站命中都不回复 |
-| engine.dsh | enabled/base_url/reply_tools | DSH 互通：开关、DSH 后端地址（3081）、回复增强工具白名单 |
+| engine.dsh | enabled/base_url/reply_tools | DSH 互通：开关、DSH web 地址（默认 3080，随 `dsh web` 端口）、回复增强工具白名单 |
 | persona | name/system_prompt | 人设（{name} 占位符） |
 
 > DSH 控制面板修改的配置存于 SQLite kv_config（覆盖层），优先级高于 config.yaml，保存即时生效；如需彻底清除覆盖层可删除 data/app.db。

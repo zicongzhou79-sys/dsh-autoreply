@@ -36,6 +36,17 @@ dsh plugin --profile web add /path/to/dsh-qq-autoreply
 # 然后重启 DSH web（守护器会自动拉起）
 ```
 
+> **依赖说明**：插件被 `link:` 到 profile 之外时，harness 包 `@deepseek-ai/dsh-attachment`
+> 不在插件自己的解析路径上。插件现在对该包做**可选加载**：解析得到就用 harness 助手，
+> 解析不到就退回 `ctx.attachments.saveImages` 公共 API（base64 校验语义一致），
+> 因此即使 `node_modules` 里的软链被 `pnpm install` 清掉，插件也不会再加载失败。
+> 若希望走 harness 自带助手，可补一条软链：
+>
+> ```bash
+> ln -sfn ~/.dsh/profiles/node_modules/@deepseek-ai/dsh-attachment \
+>   integrations/dsh-qq-autoreply/node_modules/@deepseek-ai/dsh-attachment
+> ```
+
 ## DSH 控制面板
 
 插件控制入口位于 DSH 侧栏设置入口同一组操作区域，点击后打开 QQ AutoReply 控制面板。当前面板已经接入：
