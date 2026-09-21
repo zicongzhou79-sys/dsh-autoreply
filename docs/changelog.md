@@ -2,17 +2,6 @@
 
 ## Unreleased
 
-### 修复：面板无法选择模型与 Agent preset
-
-- 根因：控制面板用 `connection.api.*` 读 DSH 目录，而当前 DSH 的客户端 `connection`
-  服务没有 `api` 字段，模型/Agent preset 读取恒为空，面板也没有全局「DSH 配置」入口。
-- 目录读取改为 `remote.session.modelCatalog()` / `remote.agentPresets.list()`（并在
-  `inject` 中声明 `remote`），工作区读取 `workspaces` 服务快照；`connection.api.*` 仅作旧版兜底。
-- 组合回控制面板的「DSH 配置」区：模型、Agent preset、工作区三个选择器 + 目录刷新按钮 +
-  失败提示（原先是静默为空），打开面板时自动刷新目录并按后端真实配置回填当前值。
-- `engine.dsh.base_url` 改为跟随当前 DSH Web 来源，不再硬编码端口。
-- 新增自测 `integrations/dsh-qq-autoreply/tests/client.catalog.test.mjs`。
-
 ### DSH Session/Agent 深度集成
 
 - AutoReply 不再向 DSH 发送本地 SQLite 历史；只发送当前消息及会话资源引用。
