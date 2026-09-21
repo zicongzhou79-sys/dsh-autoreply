@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### 修复：会话绑定区读不到模型与 Agent preset
+
+- 根因：面板用 `connection.api.*` 读 DSH 目录，而当前 DSH 的客户端 `connection`
+  服务没有 `api` 字段（只有 `rpc`/`state`/`generation`/`start`），模型与
+  Agent preset 读取恒为空，会话绑定区「此会话的 DSH 配置」两个下拉框选不了。
+- 目录读取改走 remote 命名空间：`remote.session.modelCatalog()`、
+  `remote.agentPresets.list()`（`inject` 声明 `remote`），工作区读 `workspaces`
+  服务快照；`connection.api.*` 仅作旧版兜底。
+- 统一解包 `{ok,value}` 与旧版 `{result:{ok,value}}`；读取失败在会话绑定区显示
+  可读提示而不是静默为空，并新增「刷新目录」按钮；打开面板时自动刷新目录。
+- 顺带清理无入口的全局配置写入逻辑（`selectDshValue`），模型 / Agent preset /
+  工作区选择统一留在会话绑定区。
+- 新增自测 `integrations/dsh-qq-autoreply/tests/client.catalog.test.mjs`。
+
 ### DSH Session/Agent 深度集成
 
 - AutoReply 不再向 DSH 发送本地 SQLite 历史；只发送当前消息及会话资源引用。
