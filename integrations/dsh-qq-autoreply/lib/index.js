@@ -42,7 +42,7 @@ function makeMessage(input) {
   return { ...input, id: crypto.randomUUID() }
 }
 
-const AUTOREPLY_DIR = process.env.AUTOREPLY_DIR || ' /home/user/Data/AutoReply'
+const AUTOREPLY_DIR = process.env.AUTOREPLY_DIR || process.cwd()
 const START_SCRIPT = process.env.AUTOREPLY_START_SCRIPT || `${AUTOREPLY_DIR}/scripts/start.sh`
 
 // 一键服务控制：AutoReply 自带 scripts/start.sh 负责 NapCat(容器) + 后端(uvicorn)
@@ -848,7 +848,7 @@ const tools = [
     limit: { type: 'integer', description: '返回条数，默认 50' },
   }),
   tl('qq_autoreply_messages', '读取某个 QQ 会话的消息历史（chat_key 形如 friend:<qq> 或 group:<gid>）。', {
-    chat_key: { type: 'string', description: '会话键，如 friend:29300000001 或 group:123456' },
+    chat_key: { type: 'string', description: '会话键，如 friend:10001 或 group:123456' },
     limit: { type: 'integer', description: '条数，默认 100' },
   }),
   tl('qq_autoreply_logs', '查看 QQ AutoReply 的回复决策日志（含 AI 输出/原因/耗时，可按决策类型筛选）。', {

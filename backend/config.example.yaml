@@ -4,7 +4,7 @@ server:
   webui_token: ''
 onebot:
   ws_path: /onebot/ws
-  access_token: ***REDACTED***
+  access_token: change-me-onebot-token
   heartbeat_timeout_s: 90
 llm:
   provider: ''             # DSH provider ID

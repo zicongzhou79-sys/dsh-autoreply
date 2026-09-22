@@ -82,7 +82,7 @@ function fakeCtx({ withWorkspaces = true, modelError = null, presetsError = null
   }
   if (withWorkspaces) {
     services.workspaces = {
-      list: { getSnapshot: () => ({ items: [{ workspaceId: 'ws-1', path: ' /home/user/Data/AutoReply', title: 'AutoReply' }], state: 'ready' }) },
+      list: { getSnapshot: () => ({ items: [{ workspaceId: 'ws-1', path: '/home/user/Data/AutoReply', title: 'AutoReply' }], state: 'ready' }) },
     }
   }
   return { get: (name) => services[name] }
@@ -96,7 +96,7 @@ function fakeCtx({ withWorkspaces = true, modelError = null, presetsError = null
     { value: 'deepseek-official:deepseek-v4-flash', label: 'DeepSeek / deepseek-v4-flash' },
   ])
   assert.deepEqual(result.agents, [{ id: 'standard', label: '标准' }])
-  assert.deepEqual(result.workspaces, [{ id: 'ws-1', path: ' /home/user/Data/AutoReply', label: 'AutoReply' }])
+  assert.deepEqual(result.workspaces, [{ id: 'ws-1', path: '/home/user/Data/AutoReply', label: 'AutoReply' }])
   assert.equal(result.note, '')
   console.log('✓ 当前 DSH 形态：模型 / Agent preset / 工作区均可读取')
 }
