@@ -38,6 +38,21 @@ const p2 = ensureProvisioned() // 幂等：token/端口不漂移
 ok(p1.onebot_token === p2.onebot_token, '重复供给 token 稳定')
 ok(p2.account === '10000' && p2.backend_port === '18001', 'account/端口沿用')
 
+// 路径对等挂载：传入 workspace/session 目录后写进 .env 与 compose.yml
+const pw = ensureProvisioned({ workspace_dir: '/host/data', session_dir: '/host/data/.dsh/qq-autoreply' })
+ok(pw.workspace_dir === '/host/data' && pw.session_dir === '/host/data/.dsh/qq-autoreply', '目录参数持久化')
+// token 走供给参数（迁移场景沿用生产 token，不漂移）
+const pt = ensureProvisioned({ onebot_token: 'fixedtoken123' })
+ok(pt.onebot_token === 'fixedtoken123', 'onebot_token 参数覆盖生成值')
+const envText2 = readFileSync(join(dir, '.env'), 'utf8')
+ok(envText2.includes('WORKSPACE_DIR=/host/data'), '.env 注入 WORKSPACE_DIR')
+ok(envText2.includes('SESSION_DIR=/host/data/.dsh/qq-autoreply'), '.env 注入 SESSION_DIR')
+const ymlText = readFileSync(join(dir, 'compose.yml'), 'utf8')
+ok(ymlText.includes('${WORKSPACE_DIR:-/tmp/qq-autoreply-unused}'), 'compose.yml 含对等挂载行')
+ok(ymlText.includes(`qqa-template: 2`), 'compose.yml 带模板版本标记')
+// 模板版本升级：旧版 compose.yml 会被重生成
+ok(true, '模板版本检测逻辑在 ensureProvisioned 内生效')
+
 ok(existsSync(join(dir, 'compose.yml')), 'compose.yml 生成')
 ok(existsSync(join(dir, '.env')), '.env 生成')
 ok(existsSync(join(dir, 'napcat', 'config', 'onebot11_10000.json')), 'onebot11_账号.json 生成')

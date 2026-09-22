@@ -244,8 +244,12 @@ function renderWebui(webuiToken) {
   }, null, 2) + '\n'
 }
 
+// compose.yml 模板版本：结构变更时递增，ensureProvisioned 检测到旧版会重生成
+const COMPOSE_TEMPLATE_VERSION = 2
+
 function renderComposeYml() {
-  return `name: \${COMPOSE_PROJECT:-qq-autoreply}
+  return `# qqa-template: ${COMPOSE_TEMPLATE_VERSION}
+name: \${COMPOSE_PROJECT:-qq-autoreply}
 
 services:
   backend:
@@ -259,6 +263,10 @@ services:
       - "127.0.0.1:\${BACKEND_PORT:-8001}:8001"
     volumes:
       - backend-data:/data
+      # 工作区/会话目录路径对等挂载（宿主路径 = 容器路径），保留每会话
+      # 目录能力；未配置时挂载占位目录，无副作用
+      - \${WORKSPACE_DIR:-/tmp/qq-autoreply-unused}:\${WORKSPACE_DIR:-/tmp/qq-autoreply-unused}:rw
+      - \${SESSION_DIR:-/tmp/qq-autoreply-unused}:\${SESSION_DIR:-/tmp/qq-autoreply-unused}:rw
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8001/api/status', timeout=3)"]
       interval: 10s
@@ -303,15 +311,22 @@ function ensureProvisioned(opts = {}) {
   const napcatImage = String(opts.napcat_image || prev.napcat_image || DEFAULT_NAPCAT_IMAGE)
   const backendPort = String(opts.backend_port || prev.backend_port || DEFAULT_BACKEND_PORT)
   const webuiPort = String(opts.webui_port || prev.webui_port || DEFAULT_WEBUI_PORT)
-  const onebotToken = prev.onebot_token || hexToken()
-  const webuiToken = prev.webui_token || hexToken()
+  const workspaceDir = String(opts.workspace_dir ?? prev.workspace_dir ?? '').trim()
+  const sessionDir = String(opts.session_dir ?? prev.session_dir ?? '').trim()
+  const onebotToken = String(opts.onebot_token || prev.onebot_token || hexToken())
+  const webuiToken = String(opts.webui_token || prev.webui_token || hexToken())
 
   mkdirSync(join(COMPOSE_DIR, 'napcat', 'config'), { recursive: true })
   mkdirSync(join(COMPOSE_DIR, 'napcat', 'qq-config'), { recursive: true })
   mkdirSync(join(COMPOSE_DIR, 'napcat', 'data'), { recursive: true })
 
-  // compose.yml 只在缺失时生成（用户可手工微调；.env 是唯一变量入口）
-  if (!existsSync(composeFilePath())) {
+  // compose.yml 缺失或模板版本过旧时重生成（.env 是唯一变量入口）
+  let needCompose = true
+  try {
+    const cur = readFileSync(composeFilePath(), 'utf8')
+    needCompose = !cur.includes(`qqa-template: ${COMPOSE_TEMPLATE_VERSION}`)
+  } catch { /* 文件不存在 */ }
+  if (needCompose) {
     writeFileSync(composeFilePath(), renderComposeYml(), 'utf8')
   }
   const envLines = [
@@ -324,6 +339,8 @@ function ensureProvisioned(opts = {}) {
     'TZ=Asia/Shanghai',
   ]
   if (account) envLines.push(`ACCOUNT=${account}`)
+  if (workspaceDir) envLines.push(`WORKSPACE_DIR=${workspaceDir}`)
+  if (sessionDir) envLines.push(`SESSION_DIR=${sessionDir}`)
   writeFileSync(join(COMPOSE_DIR, '.env'), envLines.join('\n') + '\n', 'utf8')
 
   // WebUI 配置：仅文件缺失时写（避免覆盖 NapCat 首启生成的用户改动）
@@ -349,6 +366,8 @@ function ensureProvisioned(opts = {}) {
     napcat_image: napcatImage,
     backend_port: backendPort,
     webui_port: webuiPort,
+    workspace_dir: workspaceDir,
+    session_dir: sessionDir,
     onebot_token: onebotToken,
     webui_token: webuiToken,
     updated_at: new Date().toISOString(),
@@ -847,11 +866,13 @@ tl('qq_autoreply_agent_info', '读取 Agent preset 的工具清单和当前 Auto
     action: { type: 'string', enum: ['start', 'stop', 'restart'], description: 'start=启动全部服务，stop=停止自动回复，restart=重启后端' },
   }),
 
-  tl('qq_autoreply_compose_provision', '（Compose 托管模式）生成/更新 AutoReply 栈供给：compose.yml、.env 与 NapCat 配置（token 自动对齐）。传入 account（QQ 号）会同时生成 onebot11 反向 WS 配置，之后 service_control start 即可拉起 backend+napcat。', {
+  tl('qq_autoreply_compose_provision', '（Compose 托管模式）生成/更新 AutoReply 栈供给：compose.yml、.env 与 NapCat 配置（token 自动对齐）。传入 account（QQ 号）会同时生成 onebot11 反向 WS 配置，之后 service_control start 即可拉起 backend+napcat。传 workspace_dir/session_dir 可保留每会话目录能力（宿主路径对等挂载）。', {
     account: { type: 'string', description: 'QQ 号；提供后自动生成 onebot11_{qq}.json', optional: true },
     image: { type: 'string', description: '后端镜像（默认 qq-autoreply-backend:latest）', optional: true },
     backend_port: { type: 'string', description: '宿主侧后端端口（默认 8001）', optional: true },
     webui_port: { type: 'string', description: '宿主侧 NapCat WebUI 端口（默认 6099）', optional: true },
+    workspace_dir: { type: 'string', description: 'DSH 工作区宿主路径（路径对等挂载进容器）', optional: true },
+    session_dir: { type: 'string', description: '会话目录宿主根路径（需在 workspace_dir 之下）', optional: true },
   }),
 ]
 

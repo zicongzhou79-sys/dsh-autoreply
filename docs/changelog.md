@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### 修复：compose 模式会话目录能力与 token 漂移（里程 A 迁移后实战修复）
+
+- 正式迁移后发现两个实战问题：
+  1. **每会话目录丢失**：容器内看不到宿主 workspace/session 路径，
+     `_session_paths` 优雅降级为空 → Agent 失去工作区绑定；
+  2. **token 漂移**：迁移脚本用 sed 事后改 .env，provision.json 里仍是
+     生成 token——任何一次重新供给都会把生产 token 覆盖回生成值，
+     NapCat 反向 WS 报 403（live 实测触发）。
+- 修复：
+  1. compose.yml 模板 v2：WORKSPACE_DIR/SESSION_DIR 路径对等挂载
+     （宿主路径 = 容器路径），未配置时挂占位目录无副作用；模板带版本
+     标记，旧文件在下次供给时自动重生成；
+  2. `onebot_token`/`webui_token` 改走供给参数（provision.json 与 .env
+     单一来源一致），迁移脚本废弃 sed 事后改写；
+  3. 会话目录权限用 ACL 共享（setfacl 授权容器 uid 10001 读写 +
+     默认 ACL 继承），宿主 DSH 用户属主不变——属主可自行 setfacl，
+     无需 root。
+- 迁移脚本：从 backend config.yaml 读取 workspace/session 目录传入供给；
+  迁移完成实测容器内会话目录可写、宿主仍可写、NapCat 反向 WS 重连成功。
+- 插件测试 23 → 30 项。
 ### 新增：面板向导化 + provider 自动检测（里程 A / A4）
 
 - provider 自动检测（`resolveProvider`）：显式 `AUTOREPLY_PROVIDER` 优先；

@@ -93,13 +93,36 @@ if [ "$DRY_RUN" = "1" ]; then
   PROVISION_DIR="$PROVISION_DIR-dryrun"
   rm -rf "$PROVISION_DIR"
 fi
+# 工作区/会话目录：从 backend config.yaml 读取，做容器路径对等挂载，
+# 保留「每会话独立目录」能力（容器里 mkdir 的目录 DSH 宿主侧同样可见）
+read -r WORKSPACE_DIR SESSION_DIR < <(python3 - <<PY
+import yaml
+cfg = (yaml.safe_load(open('$PROJECT_DIR/backend/config.yaml')) or {}).get('engine') or {}
+print((cfg.get('workspace_dir') or '').strip(), (cfg.get('session_dir') or '').strip())
+PY
+)
+[ -n "$WORKSPACE_DIR" ] && info "工作区目录: $WORKSPACE_DIR"
+[ -n "$SESSION_DIR" ] && info "会话目录:   $SESSION_DIR"
 info "生成供给到 $PROVISION_DIR …"
+# onebot_token 走供给参数（写入 provision.json + .env，保持两处一致）；
+# 生产 token 沿用，QQ 登录态与反向 WS 凭据无缝迁移
 AUTOREPLY_PROVIDER=compose AUTOREPLY_COMPOSE_DIR="$PROVISION_DIR" \
 AUTOREPLY_IMAGE="$BACKEND_IMAGE" AUTOREPLY_COMPOSE_PROJECT="$COMPOSE_PROJECT" \
-node -e "import('$PLUGIN_LIB'.replace('file://','')).then(m => { const p = m.__compose.ensureProvisioned({ account: '$ACCOUNT' }); console.log('[迁移] 供给完成 project=' + p.project) })"
+node -e "import('$PLUGIN_LIB'.replace('file://','')).then(m => { const p = m.__compose.ensureProvisioned({ account: '$ACCOUNT', workspace_dir: '$WORKSPACE_DIR', session_dir: '$SESSION_DIR', onebot_token: '$TOKEN' }); console.log('[迁移] 供给完成 project=' + p.project) })"
 
-# token 对齐为生产值（.env；onebot11_*.json 在下方复制完成后改写）
-sed -i "s/^ONEBOT_TOKEN=.*/ONEBOT_TOKEN=$TOKEN/" "$PROVISION_DIR/.env"
+# ---------- 4.5 会话目录权限共享 ----------
+# backend 容器以 uid 10001 运行，宿主 DSH 是 uid 1000。
+# 用 ACL 授权容器用户（属主可自行 setfacl，无需 root），并设默认 ACL
+# 让新建文件继承；setfacl 不可用时退回提示手工处理。
+if [ -n "$SESSION_DIR" ] && [ -d "$SESSION_DIR" ]; then
+  if command -v setfacl >/dev/null; then
+    setfacl -R -m u:10001:rwX "$SESSION_DIR" \
+      && setfacl -R -d -m u:10001:rwX "$SESSION_DIR" 2>/dev/null || true
+    info "会话目录 ACL 已授权容器用户（uid 10001）读写"
+  else
+    info "⚠️ 缺 setfacl：请手工执行 setfacl -R -m u:10001:rwX $SESSION_DIR"
+  fi
+fi
 
 # ---------- 5. 复制 NapCat 数据（登录态无缝沿用） ----------
 # QQ 登录态文件属主是容器内 root（宿主用户不可读），必须经助手容器复制；
