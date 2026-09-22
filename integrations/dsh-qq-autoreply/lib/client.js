@@ -522,7 +522,7 @@ function RulesSection() {
         ),
         React.createElement('div', { className: 'qqa-section' },
           React.createElement('h4', null, 'QQ 登录'),
-          React.createElement('iframe', { className: 'qqa-login-frame', src: 'http://127.0.0.1:6099/webui/', title: 'NapCat QQ 扫码登录' }),
+          React.createElement('iframe', { className: 'qqa-login-frame', src: NAPCAT_WEBUI_URL, title: 'NapCat QQ 扫码登录' }),
           React.createElement('div', { className: 'qqa-login-actions' },
             React.createElement('button', { className: 'qqa-btn', disabled: serviceBusy, onClick: onToggleService }, serviceBusy ? '操作中…' : (allServicesOn ? '停止服务' : '启动服务')),
             React.createElement('button', { className: 'qqa-btn', disabled: serviceBusy, onClick: onRestartService }, serviceBusy ? '操作中…' : '重启服务'),
@@ -584,8 +584,14 @@ function RulesSection() {
 
         useEffect(() => { loadDshCatalog(); }, [loadDshCatalog]);
 
+        // 面板与 AutoReply 后端/NapCat 同机部署：宿主名跟随页面地址
+        // （本机访问 127.0.0.1、远程/隧道场景为对应主机名），端口沿用约定值。
+        const BACKEND_HOST = (window.location && window.location.hostname) || '127.0.0.1';
+        const BACKEND_WS_URL = 'ws://' + BACKEND_HOST + ':8001/api/ws/live';
+        const NAPCAT_WEBUI_URL = 'http://' + BACKEND_HOST + ':6099/webui/';
+
         const openLogin = useCallback(() => {
-          window.open('http://127.0.0.1:6099/webui/', '_blank', 'noopener,noreferrer');
+          window.open(NAPCAT_WEBUI_URL, '_blank', 'noopener,noreferrer');
         }, []);
       const refresh = useCallback(async () => {
         try {
@@ -616,7 +622,7 @@ function RulesSection() {
         return () => clearInterval(t);
       }, [refresh]);
 useEffect(() => {
-          const ws = new WebSocket('ws://127.0.0.1:8001/api/ws/live');
+          const ws = new WebSocket(BACKEND_WS_URL);
           ws.onmessage = () => refresh();
           ws.onerror = () => {};
           return () => { try { ws.close(); } catch (_) {} };

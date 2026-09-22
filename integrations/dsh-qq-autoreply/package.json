@@ -1,6 +1,6 @@
 {
   "name": "dsh-qq-autoreply",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "DeepSeek Harness ↔ QQ AutoReply 互通插件：DSH 会话可通过工具查看/修改 AutoReply 配置、状态、会话与日志，并向 AutoReply 暴露 /dsh-qq/* 端点供其调用 DSH 工具增强回复；WebUI 内置 AutoReply 状态面板（client）。",
   "type": "module",
   "main": "lib/index.js",
@@ -47,5 +47,8 @@
   },
   "devDependencies": {
     "@deepseek-ai/dsh-attachment": "0.1.1-rc.2"
+  },
+  "scripts": {
+    "test": "node tests/client.catalog.test.mjs && node tests/compose.provision.test.mjs"
   }
 }

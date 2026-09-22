@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+### 新增：插件 Compose 托管生命周期（B 方案 B2）
+
+- 插件新增 ComposeProvider（`AUTOREPLY_PROVIDER=compose` 启用）：AutoReply
+  栈（backend + NapCat）由插件经 `docker compose` 托管，external 模式
+  （默认）保持 start.sh 行为不变，生产链路零影响。
+- 供给（`qq_autoreply_compose_provision` 工具，幂等）：生成
+  `~/.dsh/qq-autoreply/` 下的 compose.yml/.env/provision.json 与 NapCat
+  配置；token 自动生成并同值注入后端（env）与 NapCat（onebot11_账号.json），
+  免去手工对齐；传 account（QQ 号）才生成反向 WS 配置并随 start 拉起
+  NapCat。反向 WS 指向 compose 网络内 `ws://backend:8001/onebot/ws`，
+  不再依赖 172.17.0.1 桥接。
+- 生命周期（`qq_autoreply_service_control`，语义与 external 对齐）：
+  start=供给+up（backend 未配账号时仅 backend）+等就绪+开总开关；
+  stop=关总开关+stop backend（NapCat 保持运行）；restart=重启 backend。
+- compose 要点：backend 命名卷 + 自健康检查（python urlopen，slim 无 curl），
+  NapCat 等 backend healthy 后启动；端口仅绑 127.0.0.1。
+- client.js：面板三处硬编码 URL（实时 WS、NapCat WebUI ×2）改为按
+  `location.hostname` 派生，远程/隧道访问不再断连。
+- 测试：新增 `tests/compose.provision.test.mjs`（18 项：幂等供给/token
+  稳定/文件生成/token 对齐/回环绑定/健康门控/换账号），`npm test` 串联
+  两个插件测试；实测隔离 compose 栈（项目 qq-autoreply-test，端口
+  18001/18099）：compose config 合法 → up backend 健康(healthy) →
+  restart → stop 端口关闭 → down -v 清理，全程未触碰生产栈。
+- 版本：插件 0.2.0 → 0.3.0。
+
 ### 新增：后端容器化基础（B 方案 B1）
 
 - 目标：插件 ComposeProvider 全托管的后端进容器做准备。本批交付

@@ -93,7 +93,259 @@ async function waitForBackend(timeoutMs) {
   throw new Error(`等待 AutoReply 后端就绪超时: ${lastErr || 'unknown'}`)
 }
 
+// ============================================================
+// B 方案：Compose 托管生命周期（AUTOREPLY_PROVIDER=compose 启用）
+//
+// 插件自管 AutoReply 栈：生成 compose.yml + NapCat 配置到供给目录
+// （默认 ~/.dsh/qq-autoreply/），token 自动生成并与后端/NapCat 同值
+// 注入，免去手工对齐。external 模式（默认）保持原有 start.sh 行为。
+// ============================================================
+import { randomBytes } from 'node:crypto'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import os from 'node:os'
+
+const PROVIDER = (process.env.AUTOREPLY_PROVIDER || 'external').toLowerCase()
+const COMPOSE_DIR = process.env.AUTOREPLY_COMPOSE_DIR || join(os.homedir(), '.dsh', 'qq-autoreply')
+const DEFAULT_BACKEND_IMAGE = process.env.AUTOREPLY_IMAGE || 'qq-autoreply-backend:latest'
+const DEFAULT_NAPCAT_IMAGE = process.env.AUTOREPLY_NAPCAT_IMAGE || 'mlikiowa/napcat-docker:v4.3.5'
+const DEFAULT_BACKEND_PORT = process.env.AUTOREPLY_BACKEND_PORT || '8001' // 宿主侧发布端口
+const DEFAULT_WEBUI_PORT = process.env.AUTOREPLY_WEBUI_PORT || '6099'
+const COMPOSE_PROJECT = process.env.AUTOREPLY_COMPOSE_PROJECT || 'qq-autoreply'
+
+const provisionPath = () => join(COMPOSE_DIR, 'provision.json')
+const composeFilePath = () => join(COMPOSE_DIR, 'compose.yml')
+
+function hexToken() {
+  return randomBytes(16).toString('hex')
+}
+
+/** 执行 docker compose 子命令（cwd=供给目录，自动读取该目录 .env）。 */
+function runCompose(args, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const child = spawn('docker', ['compose', ...args], {
+      cwd: COMPOSE_DIR,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    let out = ''
+    let err = ''
+    child.stdout.on('data', (d) => { out += d })
+    child.stderr.on('data', (d) => { err += d })
+    const timer = setTimeout(() => {
+      child.kill()
+      reject(new Error(`docker compose ${args.join(' ')} 超时(>${Math.round(timeoutMs / 1000)}s): ${(err || out).trim().slice(0, 300)}`))
+    }, timeoutMs)
+    child.on('error', (e) => {
+      clearTimeout(timer)
+      reject(new Error(`无法执行 docker compose: ${e.message}（请确认已安装 Docker）`))
+    })
+    child.on('close', (code) => {
+      clearTimeout(timer)
+      if (code === 0) resolve(out.trim())
+      else reject(new Error(`docker compose ${args.join(' ')} 退出码 ${code}: ${(err || out).trim().slice(0, 300)}`))
+    })
+  })
+}
+
+/** NapCat onebot11 配置：反向 WS 指向 compose 网络内的 backend 服务。 */
+function renderOnebot11(onebotToken) {
+  return JSON.stringify({
+    network: {
+      httpServers: [],
+      httpSseServers: [],
+      httpClients: [],
+      websocketServers: [],
+      websocketClients: [{
+        name: 'qq-auto-reply',
+        enable: true,
+        url: 'ws://backend:8001/onebot/ws',
+        messagePostFormat: 'array',
+        reportSelfMessage: true,
+        reconnectInterval: 5000,
+        token: onebotToken,
+        debug: false,
+        heartInterval: 30000,
+        type: 'WebSocket 客户端',
+      }],
+    },
+    musicSignUrl: '',
+    enableLocalFile2Url: false,
+    parseMultMsg: false,
+  }, null, 2) + '\n'
+}
+
+function renderWebui(webuiToken) {
+  return JSON.stringify({
+    host: '0.0.0.0',
+    prefix: '/webui',
+    port: 6099,
+    token: webuiToken,
+    loginRate: 3,
+  }, null, 2) + '\n'
+}
+
+function renderComposeYml() {
+  return `name: \${COMPOSE_PROJECT:-qq-autoreply}
+
+services:
+  backend:
+    image: \${BACKEND_IMAGE}
+    container_name: \${COMPOSE_PROJECT}-backend
+    restart: unless-stopped
+    environment:
+      TZ: \${TZ:-Asia/Shanghai}
+      AUTOREPLY_ONEBOT_TOKEN: \${ONEBOT_TOKEN}
+    ports:
+      - "127.0.0.1:\${BACKEND_PORT:-8001}:8001"
+    volumes:
+      - backend-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8001/api/status', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+
+  napcat:
+    image: \${NAPCAT_IMAGE}
+    container_name: \${COMPOSE_PROJECT}-napcat
+    restart: unless-stopped
+    environment:
+      TZ: \${TZ:-Asia/Shanghai}
+      ACCOUNT: \${ACCOUNT:-}
+    ports:
+      - "127.0.0.1:\${WEBUI_PORT:-6099}:6099"
+    volumes:
+      - ./napcat/config:/app/napcat/config
+      - ./napcat/qq-config:/app/.config/QQ
+      - ./napcat/data:/app/napcat/data
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  backend-data:
+`
+}
+
+/**
+ * 幂等供给：生成 compose.yml/.env/NapCat 配置。
+ * 已有 provision.json 时只在 account/image/port 变化时重写对应文件。
+ * 返回供给信息；account 未定时不写 onebot11（用
+ * qq_autoreply_compose_provision 传入 QQ 号生成）。
+ */
+function ensureProvisioned(opts = {}) {
+  let prev = {}
+  try { prev = JSON.parse(readFileSync(provisionPath(), 'utf8')) } catch { /* 首次供给 */ }
+
+  const account = String(opts.account ?? prev.account ?? '').trim()
+  const backendImage = String(opts.image || prev.backend_image || DEFAULT_BACKEND_IMAGE)
+  const napcatImage = String(opts.napcat_image || prev.napcat_image || DEFAULT_NAPCAT_IMAGE)
+  const backendPort = String(opts.backend_port || prev.backend_port || DEFAULT_BACKEND_PORT)
+  const webuiPort = String(opts.webui_port || prev.webui_port || DEFAULT_WEBUI_PORT)
+  const onebotToken = prev.onebot_token || hexToken()
+  const webuiToken = prev.webui_token || hexToken()
+
+  mkdirSync(join(COMPOSE_DIR, 'napcat', 'config'), { recursive: true })
+  mkdirSync(join(COMPOSE_DIR, 'napcat', 'qq-config'), { recursive: true })
+  mkdirSync(join(COMPOSE_DIR, 'napcat', 'data'), { recursive: true })
+
+  // compose.yml 只在缺失时生成（用户可手工微调；.env 是唯一变量入口）
+  if (!existsSync(composeFilePath())) {
+    writeFileSync(composeFilePath(), renderComposeYml(), 'utf8')
+  }
+  const envLines = [
+    `COMPOSE_PROJECT=${COMPOSE_PROJECT}`,
+    `BACKEND_IMAGE=${backendImage}`,
+    `NAPCAT_IMAGE=${napcatImage}`,
+    `ONEBOT_TOKEN=${onebotToken}`,
+    `BACKEND_PORT=${backendPort}`,
+    `WEBUI_PORT=${webuiPort}`,
+    'TZ=Asia/Shanghai',
+  ]
+  if (account) envLines.push(`ACCOUNT=${account}`)
+  writeFileSync(join(COMPOSE_DIR, '.env'), envLines.join('\n') + '\n', 'utf8')
+
+  // WebUI 配置：仅文件缺失时写（避免覆盖 NapCat 首启生成的用户改动）
+  const webuiFile = join(COMPOSE_DIR, 'napcat', 'config', 'webui.json')
+  if (!existsSync(webuiFile)) {
+    writeFileSync(webuiFile, renderWebui(webuiToken), 'utf8')
+  }
+
+  // onebot11：账号就绪且（无文件或账号变化）时写
+  if (account) {
+    const obFile = join(COMPOSE_DIR, 'napcat', 'config', `onebot11_${account}.json`)
+    const accountChanged = prev.account !== account
+    if (accountChanged || !existsSync(obFile)) {
+      writeFileSync(obFile, renderOnebot11(onebotToken), 'utf8')
+    }
+  }
+
+  const provision = {
+    provider: 'compose',
+    project: COMPOSE_PROJECT,
+    account,
+    backend_image: backendImage,
+    napcat_image: napcatImage,
+    backend_port: backendPort,
+    webui_port: webuiPort,
+    onebot_token: onebotToken,
+    webui_token: webuiToken,
+    updated_at: new Date().toISOString(),
+  }
+  writeFileSync(provisionPath(), JSON.stringify(provision, null, 2) + '\n', 'utf8')
+  return provision
+}
+
+/** compose 托管模式的服务控制（语义与 external 对齐：stop 保 NapCat）。 */
+async function composeServiceControl(args) {
+  const action = (args && args.action) || 'start'
+  if (action !== 'start' && action !== 'stop' && action !== 'restart') {
+    throw new Error('action 需要是 start、stop 或 restart')
+  }
+
+  if (action === 'start') {
+    const prov = ensureProvisioned()
+    const services = prov.account ? ['backend', 'napcat'] : ['backend']
+    await runCompose(['up', '-d', ...services], 240_000)
+    await waitForBackend(60_000)
+    await ar('POST', '/api/config', { path: 'engine.master_switch', value: true })
+    const after = await ar('GET', '/api/status')
+    const note = prov.account
+      ? `Compose 栈已启动（backend+napcat）。扫码登录: http://127.0.0.1:${prov.webui_port}/webui/ （WebUI token 见 provision.json）`
+      : 'Compose 后端已启动；未配置 QQ 号，NapCat 未启动——用 qq_autoreply_compose_provision 传入 account 后重新 start'
+    return { action, provider: 'compose', services, master_switch: true, note, status: after }
+  }
+
+  if (action === 'restart') {
+    try { await ar('POST', '/api/config', { path: 'engine.master_switch', value: false }) } catch { /* 未运行也继续 */ }
+    ensureProvisioned()
+    await runCompose(['restart', 'backend'], 120_000)
+    await waitForBackend(60_000)
+    await ar('POST', '/api/config', { path: 'engine.master_switch', value: true })
+    const after = await ar('GET', '/api/status')
+    return { action, provider: 'compose', master_switch: true, note: 'Compose 后端已重启，总开关已打开', status: after }
+  }
+
+  // stop：关总开关并停 backend（napcat 保持运行，登录态不丢）
+  try { await ar('POST', '/api/config', { path: 'engine.master_switch', value: false }) } catch { /* 同上 */ }
+  await runCompose(['stop', 'backend'], 60_000)
+  return {
+    action: 'stop',
+    provider: 'compose',
+    master_switch: false,
+    backend_stopped: true,
+    note: 'Compose 后端已停止（NapCat 容器保持运行，登录态不丢）',
+    status: null,
+  }
+}
+
 async function runServiceControl(args) {
+  if (PROVIDER === 'compose') return composeServiceControl(args)
+  return externalServiceControl(args)
+}
+
+async function externalServiceControl(args) {
   const action = (args && args.action) || 'start'
   if (action !== 'start' && action !== 'stop' && action !== 'restart') {
     throw new Error('action 需要是 start、stop 或 restart')
@@ -206,9 +458,9 @@ async function handleHealth() {
   // 若这里 await AutoReply 会形成 3s+ 的环路延迟）。只做 TCP 级探测（可选），
   // 默认即返回在线。
   try {
-    return { ok: true, autoreply: true, plugin: 'dsh-qq-autoreply' }
+    return { ok: true, autoreply: true, plugin: 'dsh-qq-autoreply', provider: PROVIDER }
   } catch (e) {
-    return { ok: false, autoreply: false, error: String(e && e.message || e) }
+    return { ok: false, autoreply: false, provider: PROVIDER, error: String(e && e.message || e) }
   }
 }
 
@@ -444,6 +696,25 @@ async function runTool(tool, args) {
     case 'service_control': case 'qq_autoreply_service_control': {
       return await runServiceControl(args || {})
     }
+    case 'compose_provision': case 'qq_autoreply_compose_provision': {
+      if (PROVIDER !== 'compose') {
+        return { ok: false, error: '当前 provider 为 external（AUTOREPLY_PROVIDER=compose 启用托管模式）', provider: PROVIDER }
+      }
+      const prov = ensureProvisioned(args || {})
+      return {
+        ok: true,
+        provider: 'compose',
+        compose_dir: COMPOSE_DIR,
+        account: prov.account,
+        backend_port: prov.backend_port,
+        webui_port: prov.webui_port,
+        webui_url: `http://127.0.0.1:${prov.webui_port}/webui/`,
+        webui_token: prov.webui_token,
+        next: prov.account
+          ? 'service_control start 拉起 backend+napcat，然后打开 webui_url 扫码登录'
+          : '传入 account 后重新供给，或仅 start 先拉起 backend',
+      }
+    }
     // 回复增强工具：供 AutoReply 引擎在生成回复前调用，获取「账号视角」的
     // 当前状态摘要（连接/开关/今日统计）作为上下文增强。
     case 'reply_knowledge': case 'qq_reply_knowledge': {
@@ -515,6 +786,13 @@ tl('qq_autoreply_agent_info', '读取 Agent preset 的工具清单和当前 Auto
   tl('qq_autoreply_service_control', '一键启动/停止/重启 QQ AutoReply 全部服务：start 会确保 NapCat 容器与 AutoReply 后端(:8001) 运行并打开总开关；stop 会关闭总开关并停止后端（NapCat 容器保持运行）；restart 会重启后端。', {
     action: { type: 'string', enum: ['start', 'stop', 'restart'], description: 'start=启动全部服务，stop=停止自动回复，restart=重启后端' },
   }),
+
+  tl('qq_autoreply_compose_provision', '（Compose 托管模式）生成/更新 AutoReply 栈供给：compose.yml、.env 与 NapCat 配置（token 自动对齐）。传入 account（QQ 号）会同时生成 onebot11 反向 WS 配置，之后 service_control start 即可拉起 backend+napcat。', {
+    account: { type: 'string', description: 'QQ 号；提供后自动生成 onebot11_{qq}.json', optional: true },
+    image: { type: 'string', description: '后端镜像（默认 qq-autoreply-backend:latest）', optional: true },
+    backend_port: { type: 'string', description: '宿主侧后端端口（默认 8001）', optional: true },
+    webui_port: { type: 'string', description: '宿主侧 NapCat WebUI 端口（默认 6099）', optional: true },
+  }),
 ]
 
 export function apply(ctx) {
@@ -565,6 +843,9 @@ export function apply(ctx) {
   // ---- system prompt hint ----
   ctx.systemPrompt.section({
     name: 'tool:qq-autoreply', order: 200,
-    text: '本机已挂载 QQ AutoReply 互通插件：可用 qq_autoreply_service_control 一键启动/停止全部服务（NapCat + AutoReply 后端 + 总开关）；用 qq_autoreply_status / qq_autoreply_config_get / qq_autoreply_config_set / qq_autoreply_sessions / qq_autoreply_messages / qq_autoreply_logs / qq_autoreply_test_llm 工具查看与修改本地 QQ 自动回复服务（配置改动立即生效，存储在 AutoReply 的 SQLite 覆盖层）。修改人设用 config_set(path="persona.system_prompt")；选择 DSH 模型用 config_set(path="llm.model")。',
+    text: '本机已挂载 QQ AutoReply 互通插件：可用 qq_autoreply_service_control 一键启动/停止全部服务（NapCat + AutoReply 后端 + 总开关）；用 qq_autoreply_status / qq_autoreply_config_get / qq_autoreply_config_set / qq_autoreply_sessions / qq_autoreply_messages / qq_autoreply_logs / qq_autoreply_test_llm 工具查看与修改本地 QQ 自动回复服务（配置改动立即生效，存储在 AutoReply 的 SQLite 覆盖层）。修改人设用 config_set(path="persona.system_prompt")；选择 DSH 模型用 config_set(path="llm.model")。Compose 托管模式下另有 qq_autoreply_compose_provision：生成/更新栈供给（compose.yml/.env/NapCat 配置，token 自动对齐），传 account（QQ 号）后 start 即拉起全部服务。',
   })
 }
+
+// 测试钩子：供给与 compose 生命周期的纯逻辑可在宿主 Node 里直测
+export const __compose = { ensureProvisioned, composeServiceControl, runCompose, PROVIDER, COMPOSE_DIR }
