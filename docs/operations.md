@@ -87,6 +87,7 @@ docker start napcat                              # 旧 napcat 容器仍在（迁
 |---|---|---|
 | napcat 日志 `反向WebSocket … 403` | token 漂移（.env 与 onebot11_*.json 不一致） | 用 `qq_autoreply_compose_provision` 重跑供给（token 走 provision.json 单一来源），勿只手工改 .env |
 | `connected=false, login=false` | QQ 登录态失效 | 面板 QQ 登录区重新扫码（compose 模式 iframe 已带 token） |
+| 重启后弹二维码：`正在快速登录 <错误账号>` | 镜像 entrypoint 按 `ls config/` 字母序取第一个带 QQ 号的文件选快速登录账号；残留的其它账号 `onebot11_*/napcat_*.json` 会抢占 | 把非机器人账号的 `config/onebot11_<x>.json`、`napcat_<x>.json` 移出（如 `stale-backup/`），重启即自动快速登录正确账号 |
 | backend 反复重启 | `docker compose logs backend` 看报错；常见 .env 镜像名拼错 | 修正 .env 后 `up -d` |
 | 端口 8001 被占 | 旧宿主 uvicorn 残留 | `pkill -f "uvicorn.*8001"` 后 `docker compose up -d` |
 | 每会话目录失效 | WORKSPACE_DIR/SESSION_DIR 未配置或权限缺失 | `.env` 配齐宿主路径；`setfacl -R -m u:10001:rwX <session_dir>`；`up -d backend` |

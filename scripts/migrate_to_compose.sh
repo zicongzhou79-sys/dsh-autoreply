@@ -155,6 +155,19 @@ for f in glob.glob(f"{d}/napcat/config/onebot11_*.json"):
     print("[迁移] 已改写", f, "→ ws://backend:8001/onebot/ws")
 PY
 
+# 陈旧账号文件隔离：镜像 entrypoint 用 `ls config/ | grep 数字 | head -1`
+# 选快速登录账号（字母序）——残留的其它账号 onebot11_*/napcat_*.json 会让
+# NapCat 登错号、弹永久过不去的二维码（生产实测）。移出并备份，不删除。
+mkdir -p "$PROVISION_DIR/napcat/stale-backup"
+for f in "$PROVISION_DIR"/napcat/config/onebot11_*.json "$PROVISION_DIR"/napcat/config/napcat_*.json; do
+  [ -f "$f" ] || continue
+  num="$(basename "$f" | grep -oE '[1-9][0-9]{4,12}' || true)"
+  if [ -n "$num" ] && [ "$num" != "$ACCOUNT" ]; then
+    mv "$f" "$PROVISION_DIR/napcat/stale-backup/" \
+      && info "隔离陈旧账号文件 $(basename "$f")（→ napcat/stale-backup/）"
+  fi
+done
+
 # ---------- 6. backend SQLite → backend-data 命名卷 ----------
 if [ "$DRY_RUN" != "1" ]; then
   info "迁移 backend 数据库到命名卷…"
