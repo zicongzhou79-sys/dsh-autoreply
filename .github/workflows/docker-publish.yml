@@ -40,14 +40,18 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       # 同一 tag 触发 npm 发布：需要 secret NPM_TOKEN（npm publish 需账号，
-      # 此步在未配置 secret 时跳过）
+      # 未配置 secret 时脚本内自动跳过）
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
           registry-url: https://registry.npmjs.org
       - name: 发布插件到 npm
         working-directory: integrations/dsh-qq-autoreply
-        if: ${{ secrets.NPM_TOKEN != '' }}
-        run: npm publish --access public
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "⏭️ 未配置 NPM_TOKEN secret，跳过 npm 发布"
+          else
+            npm publish --access public
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
