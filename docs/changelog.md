@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### 新增：运维手册（双模式）与 A3 全新安装验证脚本（里程 A 预备）
+
+- `docs/operations.md` 重写为双模式：compose 托管（架构/状态/日志/升级/
+  备份/回滚 external/常见故障含 403 token 漂移、每会话目录失效）+ 旧版
+  external 附录。
+- `scripts/verify_fresh_install.sh`：npm 发布后验证全新安装链路（包存在/
+  tarball 内容完整/JS 语法/ghcr 匿名可见/已发布包供给自检），未就绪时
+  优雅 SKIP，可反复重跑；本地 npm pack 预检确认发布清单 5 文件齐全、
+  供给自检逻辑实测通过。
 ### 修复：compose 模式会话目录能力与 token 漂移（里程 A 迁移后实战修复）
 
 - 正式迁移后发现两个实战问题：
