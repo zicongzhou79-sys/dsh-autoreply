@@ -499,7 +499,7 @@ function RulesSection() {
     function DetailPanel({ status, logs, sessions, onRefresh, onToggleMaster,
       serviceBusy, serviceNote, allServicesOn, onToggleService, onRestartService, catalog,
       onOpenLogin, onSaveSessionBinding, onToggleSessionAuto, onDeleteSessionBinding,
-      onReloadCatalog, onClose }) {
+      onReloadCatalog, onClose, compose, loginUrl }) {
       const allOk = !!(status && status.onebot_connected && status.onebot_login && status.llm_configured && status.dsh_online);
       return React.createElement('div', { className: 'qqa-panel', role: 'dialog', 'aria-label': 'QQ 自动回复控制面板' },
         React.createElement('div', { className: 'qqa-topbar' },
@@ -522,13 +522,27 @@ function RulesSection() {
         ),
         React.createElement('div', { className: 'qqa-section' },
           React.createElement('h4', null, 'QQ 登录'),
-          React.createElement('iframe', { className: 'qqa-login-frame', src: NAPCAT_WEBUI_URL, title: 'NapCat QQ 扫码登录' }),
+          React.createElement('iframe', { className: 'qqa-login-frame', src: loginUrl || NAPCAT_WEBUI_URL, title: 'NapCat QQ 扫码登录' }),
           React.createElement('div', { className: 'qqa-login-actions' },
             React.createElement('button', { className: 'qqa-btn', disabled: serviceBusy, onClick: onToggleService }, serviceBusy ? '操作中…' : (allServicesOn ? '停止服务' : '启动服务')),
             React.createElement('button', { className: 'qqa-btn', disabled: serviceBusy, onClick: onRestartService }, serviceBusy ? '操作中…' : '重启服务'),
             React.createElement('button', { className: 'qqa-btn', onClick: onOpenLogin }, status && status.onebot_login ? '打开 NapCat 登录管理' : '打开 QQ 扫码登录'),
           ),
         ),
+        (compose && compose.ok) ? React.createElement('div', { className: 'qqa-section' },
+          React.createElement('h4', null, '托管与安装（compose）'),
+          React.createElement('div', { className: 'qqa-grid' },
+            React.createElement('div', { className: 'qqa-kv' }, React.createElement('span', null, '托管模式'), React.createElement('b', null, 'compose · ' + (compose.project || 'qq-autoreply'))),
+            React.createElement('div', { className: 'qqa-kv' }, React.createElement('span', null, 'QQ 账号'), React.createElement('b', null, compose.account || '未配置')),
+            React.createElement('div', { className: 'qqa-kv' }, React.createElement('span', null, '后端端口'), React.createElement('b', null, compose.backend_port || '8001')),
+            React.createElement('div', { className: 'qqa-kv' }, React.createElement('span', null, '栈服务'), React.createElement('b', null, (compose.services || []).map((s) => s.service + ' ' + (s.health || s.state)).join('　') || '未知')),
+            React.createElement('div', { className: 'qqa-kv' }, React.createElement('span', null, '安装体检'), React.createElement('b', null,
+              (compose.checks && compose.checks.compose_file ? '✓ 供给' : '✗ 供给'),
+              ' ', (compose.checks && compose.checks.token_aligned ? '✓ token' : '✗ token'),
+              ' ', (compose.services || []).length >= 2 ? '✓ 双服务' : '✗ 双服务'))),
+          React.createElement('div', { className: 'qqa-login-actions' },
+            React.createElement('a', { className: 'qqa-btn', href: loginUrl || compose.webui_url, target: '_blank', rel: 'noopener noreferrer' }, '打开 NapCat WebUI（免 token）')),
+        ) : null,
         React.createElement(SessionBindingEditor, { sessions, agents: catalog.agents, workspaces: catalog.workspaces, models: catalog.models, note: catalog.note, onSave: onSaveSessionBinding, onReloadCatalog: onReloadCatalog, onToggleAuto: onToggleSessionAuto, onDeleteBinding: onDeleteSessionBinding }),
         React.createElement(RulesSection, null),
         React.createElement(ChatSection, { sessions, logs }),
@@ -593,6 +607,24 @@ function RulesSection() {
         const openLogin = useCallback(() => {
           window.open(NAPCAT_WEBUI_URL, '_blank', 'noopener,noreferrer');
         }, []);
+
+        // compose 托管信息（provider 自动检测后此路由返回供给与服务状态）
+        const [compose, setCompose] = React.useState(null);
+        const loadCompose = useCallback(async () => {
+          try {
+            const r = await fetch('/dsh-qq/compose', { headers: { accept: 'application/json' } });
+            if (r.ok) setCompose(await r.json());
+          } catch { /* 路由不存在（旧版插件）时保持 null */ }
+        }, []);
+        useEffect(() => {
+          loadCompose();
+          const t = setInterval(loadCompose, 10000);
+          return () => clearInterval(t);
+        }, [loadCompose]);
+        // compose 模式下用带 token 的 WebUI 地址：扫码页免输 token
+        const loginUrl = compose && compose.ok && compose.webui_token
+          ? 'http://' + BACKEND_HOST + ':' + (compose.webui_port || '6099') + '/webui/?token=' + encodeURIComponent(compose.webui_token)
+          : NAPCAT_WEBUI_URL;
       const refresh = useCallback(async () => {
         try {
           const st = await arExec('status');
@@ -717,6 +749,7 @@ useEffect(() => {
           serviceBusy: service.busy, serviceNote: service.note,
           allServicesOn, onToggleService: toggleService, onRestartService: restartService, catalog,
           onOpenLogin: openLogin,
+          compose: compose, loginUrl: loginUrl,
             onSaveSessionBinding: saveSessionBinding,
             onToggleSessionAuto: toggleSessionAuto,
             onDeleteSessionBinding: deleteSessionBinding,

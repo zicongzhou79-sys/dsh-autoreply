@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### 新增：面板向导化 + provider 自动检测（里程 A / A4）
+
+- provider 自动检测（`resolveProvider`）：显式 `AUTOREPLY_PROVIDER` 优先；
+  未设置时「`~/.dsh/qq-autoreply/provision.json` 存在 → compose」。迁移
+  完成后重启 DSH 即自动切托管模式，杜绝 external 的 start.sh 与 compose
+  栈抢 8001 端口。
+- 新增 `/dsh-qq/compose` 路由：托管项目/账号/端口/服务状态（compose ps）
+  /安装体检（供给+token 对齐+双服务），面板「托管与安装」区数据源。
+- 面板（client）：新增「托管与安装（compose）」区（模式/账号/端口/栈服务
+  /体检徽标）；compose 模式下 QQ 登录 iframe 改用带 token 的 WebUI 地址，
+  扫码页免输 token。
+- 测试：resolveProvider 5 项分支断言，插件测试 18 → 23 项。
 ### 新增：发布工程与迁移路径（B 方案 B3）
 
 - `scripts/migrate_to_compose.sh`：external → compose 托管栈迁移。

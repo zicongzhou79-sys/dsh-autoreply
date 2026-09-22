@@ -23,7 +23,15 @@ process.env.AUTOREPLY_COMPOSE_PROJECT = 'qq-autoreply-test'
 // node --experimental-vm-modules 不需要：直接子进程跑 ESM 模块
 const mod = await import('../lib/index.js')
 const { ensureProvisioned, PROVIDER } = mod.__compose
+const { resolveProvider } = mod
 ok(PROVIDER === 'compose', 'AUTOREPLY_PROVIDER=compose 生效')
+
+// provider 解析：显式 env 优先，未设置时按供给文件是否存在自动切换
+ok(resolveProvider('compose', false) === 'compose', '显式 compose 生效')
+ok(resolveProvider('external', true) === 'external', '显式 external 覆盖供给存在')
+ok(resolveProvider('', false) === 'external', '无 env 无供给 → external')
+ok(resolveProvider('', true) === 'compose', '无 env 有供给 → 自动 compose（迁移后重启即切换）')
+ok(resolveProvider('  COMPOSE  ', true) === 'compose', 'env 大小写/空白容忍')
 
 const p1 = ensureProvisioned({ account: '10000' })
 const p2 = ensureProvisioned() // 幂等：token/端口不漂移

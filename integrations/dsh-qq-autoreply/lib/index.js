@@ -105,13 +105,73 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import os from 'node:os'
 
-const PROVIDER = (process.env.AUTOREPLY_PROVIDER || 'external').toLowerCase()
 const COMPOSE_DIR = process.env.AUTOREPLY_COMPOSE_DIR || join(os.homedir(), '.dsh', 'qq-autoreply')
 const DEFAULT_BACKEND_IMAGE = process.env.AUTOREPLY_IMAGE || 'qq-autoreply-backend:latest'
 const DEFAULT_NAPCAT_IMAGE = process.env.AUTOREPLY_NAPCAT_IMAGE || 'mlikiowa/napcat-docker:v4.3.5'
 const DEFAULT_BACKEND_PORT = process.env.AUTOREPLY_BACKEND_PORT || '8001' // 宿主侧发布端口
 const DEFAULT_WEBUI_PORT = process.env.AUTOREPLY_WEBUI_PORT || '6099'
 const COMPOSE_PROJECT = process.env.AUTOREPLY_COMPOSE_PROJECT || 'qq-autoreply'
+
+/**
+ * Provider 解析：显式环境变量优先；未设置时「供给目录已存在 → compose」。
+ * 迁移完成后（provision.json 存在）无需改任何环境变量，重启 DSH 即自动
+ * 切到托管模式，避免 external 的 start.sh 与 compose 栈抢 8001 端口。
+ */
+export function resolveProvider(explicit, provisionFileExists) {
+  const e = String(explicit || '').toLowerCase().trim()
+  if (e === 'compose' || e === 'external') return e
+  return provisionFileExists ? 'compose' : 'external'
+}
+
+const PROVIDER = resolveProvider(process.env.AUTOREPLY_PROVIDER, existsSync(join(COMPOSE_DIR, 'provision.json')))
+
+/** compose 栈服务状态（docker compose ps --format json，兼容数组/JSONL 两种输出）。 */
+async function composeServiceStates() {
+  try {
+    const out = await runCompose(['ps', '--format', 'json'], 20_000)
+    const lines = out.trim().split('\n').filter(Boolean)
+    const parsed = out.trim().startsWith('[')
+      ? JSON.parse(out)
+      : lines.map((l) => { try { return JSON.parse(l) } catch { return null } }).filter(Boolean)
+    return parsed.map((o) => ({
+      service: o.Service || o.Name || '',
+      state: o.State || '',
+      health: o.Health || '',
+    }))
+  } catch {
+    return []
+  }
+}
+
+/** /dsh-qq/compose：托管模式状态 + 供给信息（面板「托管与安装」区数据源）。 */
+async function handleComposeStatus() {
+  if (PROVIDER !== 'compose') {
+    return { ok: false, provider: PROVIDER, note: 'external 模式；存在 ~/.dsh/qq-autoreply/provision.json 时重启 DSH 自动切 compose' }
+  }
+  let provision = {}
+  try { provision = JSON.parse(readFileSync(provisionPath(), 'utf8')) } catch { /* 无供给文件 */ }
+  const services = await composeServiceStates()
+  const webuiPort = provision.webui_port || DEFAULT_WEBUI_PORT
+  return {
+    ok: true,
+    provider: 'compose',
+    project: provision.project || COMPOSE_PROJECT,
+    compose_dir: COMPOSE_DIR,
+    account: provision.account || '',
+    backend_port: provision.backend_port || DEFAULT_BACKEND_PORT,
+    webui_port: webuiPort,
+    webui_token: provision.webui_token || '',
+    webui_url: `http://127.0.0.1:${webuiPort}/webui/`,
+    services,
+    // 安装体检：能走到这里 = docker/compose 可用 + 供给完整
+    checks: {
+      docker: true,
+      compose_file: existsSync(composeFilePath()),
+      provision: Boolean(provision.onebot_token),
+      token_aligned: Boolean(provision.onebot_token),
+    },
+  }
+}
 
 const provisionPath = () => join(COMPOSE_DIR, 'provision.json')
 const composeFilePath = () => join(COMPOSE_DIR, 'compose.yml')
@@ -809,6 +869,8 @@ export function apply(ctx) {
       try {
         if (url.pathname === '/dsh-qq/health') {
           send(200, await handleHealth())
+        } else if (url.pathname === '/dsh-qq/compose') {
+          send(200, await handleComposeStatus())
         } else if (url.pathname === '/dsh-qq/execute') {
           if (req.method !== 'POST') return send(405, { ok: false, error: 'POST only' })
           let body = {}
