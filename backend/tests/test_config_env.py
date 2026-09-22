@@ -69,3 +69,16 @@ def test_invalid_port_ignored(monkeypatch, tmp_path):
     monkeypatch.setenv("AUTOREPLY_PORT", "not-a-port")
     cfg = load_config(tmp_path / "absent.yaml")
     assert cfg.server.port == 8001
+
+
+def test_dsh_base_url_env_override(monkeypatch, tmp_path):
+    """AUTOREPLY_DSH_BASE_URL 覆盖 engine.dsh.base_url（容器经 host-gateway 访问 DSH）。"""
+    monkeypatch.setenv("AUTOREPLY_DSH_BASE_URL", "http://host.docker.internal:3080")
+    cfg = load_config(tmp_path / "absent.yaml")
+    assert cfg.engine.dsh.base_url == "http://host.docker.internal:3080"
+
+
+def test_dsh_base_url_env_empty_keeps_default(monkeypatch, tmp_path):
+    monkeypatch.delenv("AUTOREPLY_DSH_BASE_URL", raising=False)
+    cfg = load_config(tmp_path / "absent.yaml")
+    assert cfg.engine.dsh.base_url == "http://127.0.0.1:3080"

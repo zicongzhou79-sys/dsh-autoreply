@@ -162,7 +162,9 @@ if [ "$DRY_RUN" != "1" ]; then
   cp -a "$PROJECT_DIR/data/." "$STAGING/"
   VOL="${COMPOSE_PROJECT}_backend-data"
   docker volume create "$VOL" >/dev/null
-  docker run --rm -v "$VOL":/data -v "$STAGING":/src:ro busybox sh -c "cp -a /src/. /data/"
+  # 关键：busybox 以 root 拷贝 → 文件属主 root；backend 容器以 uid 10001
+  # 运行，必须把属主改回 10001，否则 SQLite 只读、首条消息即写库失败
+  docker run --rm -v "$VOL":/data -v "$STAGING":/src:ro busybox sh -c "cp -a /src/. /data/ && chown -R 10001:10001 /data"
   rm -rf "$STAGING"
 else
   info "[试运行] 跳过数据库入卷（正式模式将复制 data/ → ${COMPOSE_PROJECT}_backend-data 卷）"

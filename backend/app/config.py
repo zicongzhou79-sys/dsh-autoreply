@@ -122,6 +122,12 @@ def _apply_env_overrides(cfg: AppConfig) -> AppConfig:
     port = os.environ.get("AUTOREPLY_PORT", "").strip()
     if port.isdigit() and 0 < int(port) < 65536:
         cfg.server.port = int(port)
+    dsh_url = os.environ.get("AUTOREPLY_DSH_BASE_URL", "").strip()
+    if dsh_url:
+        # 容器内 127.0.0.1 指容器自身；由编排方注入 host 网关地址
+        # （如 http://host.docker.internal:3080），DB 里的配置保持不动，
+        # 回滚宿主运行时无需改配置。
+        cfg.engine.dsh.base_url = dsh_url
     return cfg
 
 

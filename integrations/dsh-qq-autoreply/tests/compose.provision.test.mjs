@@ -46,7 +46,11 @@ ok(envText2.includes('WORKSPACE_DIR=/host/data'), '.env 注入 WORKSPACE_DIR')
 ok(envText2.includes('SESSION_DIR=/host/data/.dsh/qq-autoreply'), '.env 注入 SESSION_DIR')
 const ymlText = readFileSync(join(dir, 'compose.yml'), 'utf8')
 ok(ymlText.includes('${WORKSPACE_DIR:-/tmp/qq-autoreply-unused}'), 'compose.yml 含对等挂载行')
-ok(ymlText.includes(`qqa-template: 2`), 'compose.yml 带模板版本标记')
+ok(ymlText.includes(`qqa-template: 4`), 'compose.yml 带模板版本标记 v4')
+ok(ymlText.includes('network_mode: host'), 'backend 使用 host 网络（DSH 回环可达）')
+ok(ymlText.includes('AUTOREPLY_DSH_BASE_URL'), 'backend 注入 DSH 地址覆盖')
+ok(ymlText.includes('"backend:host-gateway"'), 'napcat 经宿主网关回连 backend')
+ok(envText2.includes('DSH_BASE_URL='), '.env 注入 DSH_BASE_URL')
 // 模板版本升级：旧版 compose.yml 会被重生成
 ok(true, '模板版本检测逻辑在 ensureProvisioned 内生效')
 
@@ -68,7 +72,11 @@ ok(envText.includes('BACKEND_PORT=18001'), '.env 注入端口')
 
 const yml = readFileSync(join(dir, 'compose.yml'), 'utf8')
 ok(yml.includes('AUTOREPLY_ONEBOT_TOKEN: ${ONEBOT_TOKEN}'), 'compose 传递 token 给后端')
-ok(yml.includes('127.0.0.1:${BACKEND_PORT'), '后端端口只绑回环')
+// v4：backend 走 host 网络（无端口映射，uvicorn 直监听宿主 8001，与 external
+// 模式暴露面一致）；回环限定只剩 NapCat WebUI 的 127.0.0.1 发布
+ok(yml.includes('network_mode: host'), 'backend host 网络')
+ok(!yml.includes('127.0.0.1:${BACKEND_PORT'), 'backend 不再发布端口（host 网络）')
+ok(yml.includes('127.0.0.1:${WEBUI_PORT'), 'WebUI 端口只绑回环')
 ok(yml.includes('condition: service_healthy'), 'napcat 等 backend 健康后启动')
 
 // 换账号：onebot11 重写为新账号文件，token 不变

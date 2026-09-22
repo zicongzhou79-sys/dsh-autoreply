@@ -245,7 +245,7 @@ function renderWebui(webuiToken) {
 }
 
 // compose.yml 模板版本：结构变更时递增，ensureProvisioned 检测到旧版会重生成
-const COMPOSE_TEMPLATE_VERSION = 2
+const COMPOSE_TEMPLATE_VERSION = 4
 
 function renderComposeYml() {
   return `# qqa-template: ${COMPOSE_TEMPLATE_VERSION}
@@ -256,11 +256,14 @@ services:
     image: \${BACKEND_IMAGE}
     container_name: \${COMPOSE_PROJECT}-backend
     restart: unless-stopped
+    # 与宿主共享 netns：DSH web 只听 127.0.0.1:3080，host 网络下天然可达；
+    # uvicorn 直接监听宿主 0.0.0.0:8001（与 external 模式暴露面一致）
+    network_mode: host
     environment:
       TZ: \${TZ:-Asia/Shanghai}
       AUTOREPLY_ONEBOT_TOKEN: \${ONEBOT_TOKEN}
-    ports:
-      - "127.0.0.1:\${BACKEND_PORT:-8001}:8001"
+      # host 网络下 127.0.0.1 即宿主回环；保留覆盖入口以兼容特殊部署
+      AUTOREPLY_DSH_BASE_URL: \${DSH_BASE_URL:-http://127.0.0.1:3080}
     volumes:
       - backend-data:/data
       # 工作区/会话目录路径对等挂载（宿主路径 = 容器路径），保留每会话
@@ -281,6 +284,9 @@ services:
     environment:
       TZ: \${TZ:-Asia/Shanghai}
       ACCOUNT: \${ACCOUNT:-}
+    extra_hosts:
+      # backend 在宿主 netns，DNS 无此名字；经宿主网关访问 0.0.0.0:8001
+      - "backend:host-gateway"
     ports:
       - "127.0.0.1:\${WEBUI_PORT:-6099}:6099"
     volumes:
@@ -341,6 +347,8 @@ function ensureProvisioned(opts = {}) {
   if (account) envLines.push(`ACCOUNT=${account}`)
   if (workspaceDir) envLines.push(`WORKSPACE_DIR=${workspaceDir}`)
   if (sessionDir) envLines.push(`SESSION_DIR=${sessionDir}`)
+  // DSH web 地址：backend 为 host 网络，127.0.0.1 即宿主回环
+  envLines.push(`DSH_BASE_URL=${opts.dsh_base_url || prev.dsh_base_url || 'http://127.0.0.1:3080'}`)
   writeFileSync(join(COMPOSE_DIR, '.env'), envLines.join('\n') + '\n', 'utf8')
 
   // WebUI 配置：仅文件缺失时写（避免覆盖 NapCat 首启生成的用户改动）

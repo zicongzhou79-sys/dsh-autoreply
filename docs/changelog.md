@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+### 修复：compose 栈三连 bug（E2E 注入测试实战发现）
+
+用「独占 OneBot WS 注入合成消息」的端到端测试法，在真实流量到来前
+连续暴露并修复三个只在写路径上才会炸的问题：
+
+1. **SQLite 只读**：迁移用 busybox(root) 拷贝 app.db 入卷 → 属主 root，
+   uid 10001 的容器读正常、写全炸（首条消息即触发）。修：拷贝后
+   `chown -R 10001:10001`，迁移脚本固化该步。
+2. **DSH 桥接不可达**：配置 `engine.dsh.base_url=127.0.0.1:3080` 在容器
+   内指向容器自身；且宿主 DSH web 只听回环，host-gateway 也到不了。
+   修：config.py 新增 `AUTOREPLY_DSH_BASE_URL` env 覆盖（DB 配置不动，
+   回滚宿主运行时无需改配置）+ compose 模板 v4 把 backend 放到 host
+   网络（127.0.0.1 即宿主回环），NapCat 经 `backend:host-gateway` 别名
+   回连。
+3. **测试断言随模板演进更新**：host 网络下 backend 无端口发布，回环
+   限定收敛到 NapCat WebUI。
+
+- 插件测试 30 → 36 项；后端 42 项。
+- 附：E2E 注入脚本要点（docker exec 容器内独占 WS 连接，天然可复用
+  于回归验证），NapCat 快速登录在非优雅停机后会失效需重扫，运维手册
+  已有对应条目。
 ### 新增：运维手册（双模式）与 A3 全新安装验证脚本（里程 A 预备）
 
 - `docs/operations.md` 重写为双模式：compose 托管（架构/状态/日志/升级/
