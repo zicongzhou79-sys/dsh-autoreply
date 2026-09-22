@@ -41,9 +41,6 @@ ok(p2.account === '10000' && p2.backend_port === '18001', 'account/端口沿用'
 // 路径对等挂载：传入 workspace/session 目录后写进 .env 与 compose.yml
 const pw = ensureProvisioned({ workspace_dir: '/host/data', session_dir: '/host/data/.dsh/qq-autoreply' })
 ok(pw.workspace_dir === '/host/data' && pw.session_dir === '/host/data/.dsh/qq-autoreply', '目录参数持久化')
-// token 走供给参数（迁移场景沿用生产 token，不漂移）
-const pt = ensureProvisioned({ onebot_token: 'fixedtoken123' })
-ok(pt.onebot_token === 'fixedtoken123', 'onebot_token 参数覆盖生成值')
 const envText2 = readFileSync(join(dir, '.env'), 'utf8')
 ok(envText2.includes('WORKSPACE_DIR=/host/data'), '.env 注入 WORKSPACE_DIR')
 ok(envText2.includes('SESSION_DIR=/host/data/.dsh/qq-autoreply'), '.env 注入 SESSION_DIR')
@@ -78,6 +75,11 @@ ok(yml.includes('condition: service_healthy'), 'napcat 等 backend 健康后启�
 const p3 = ensureProvisioned({ account: '20000' })
 ok(existsSync(join(dir, 'napcat', 'config', 'onebot11_20000.json')), '换账号生成新 onebot11')
 ok(p3.onebot_token === p1.onebot_token, '换账号 token 不漂移')
+
+// token 走供给参数（迁移场景沿用生产 token，不漂移）——放最后，
+// 因为它会改变持久化的 provision.json token，影响后续断言
+const pt = ensureProvisioned({ onebot_token: 'fixedtoken123' })
+ok(pt.onebot_token === 'fixedtoken123', 'onebot_token 参数覆盖生成值')
 
 rmSync(dir, { recursive: true, force: true })
 console.log(`\n全部 ${pass} 项通过`)
