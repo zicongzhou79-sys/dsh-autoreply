@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r backend/requirements.txt pytest pytest-asyncio
+      - run: python -m pytest -q backend/tests
+
+  plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: 语法检查
+        run: |
+          node --check integrations/dsh-qq-autoreply/lib/index.js
+          node --check integrations/dsh-qq-autoreply/lib/client.js
+      - name: 插件测试（client + compose 供给）
+        working-directory: integrations/dsh-qq-autoreply
+        run: npm test
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 构建后端镜像（amd64）
+        run: docker build -t qq-autoreply-backend:ci backend
+      - name: 容器冒烟验证
+        run: bash scripts/verify_container.sh qq-autoreply-backend:ci

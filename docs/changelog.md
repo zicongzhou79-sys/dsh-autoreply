@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### 新增：发布工程与迁移路径（B 方案 B3）
+
+- `scripts/migrate_to_compose.sh`：external → compose 托管栈迁移。
+  token 保持生产值不变（QQ 登录态与反向 WS 凭据无缝沿用）；NapCat
+  登录态经 busybox 助手容器复制（宿主用户读不了容器 root 属主文件）；
+  onebot11 反向 WS 改写为 compose 网络地址（**必须在复制之后执行**，
+  否则被生产原版覆盖——试运行实测抓出的时序 bug）；ACCOUNT 取自后端
+  `/api/status` 登录账号（配置目录残留他账号文件，按文件名取会登错号）。
+  `MIGRATE_DRY_RUN=1` 试运行不动任何服务，已实测通过（url 改写、
+  token 对齐、ACCOUNT=登录账号 三项断言全绿）。
+- CI：`.github/workflows/ci.yml`（pytest / 插件语法+测试 / 镜像构建+
+  容器冒烟）；`.github/workflows/docker-publish.yml`（打 tag 多架构
+  buildx → GHCR，NPM_TOKEN 配置后同流水线发 npm）。
+- 插件 README 重写：双模式说明（external/compose）、compose 安装故事、
+  工具清单、修正过时的目录读取描述（connection.api → remote 命名空间）。
+
 ### 新增：插件 Compose 托管生命周期（B 方案 B2）
 
 - 插件新增 ComposeProvider（`AUTOREPLY_PROVIDER=compose` 启用）：AutoReply
