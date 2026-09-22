@@ -50,5 +50,13 @@
   },
   "scripts": {
     "test": "node tests/client.catalog.test.mjs && node tests/compose.provision.test.mjs"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zicongzhou79-sys/dsh-autoreply.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zicongzhou79-sys/dsh-autoreply/issues"
+  },
+  "homepage": "https://github.com/zicongzhou79-sys/dsh-autoreply#readme"
 }
