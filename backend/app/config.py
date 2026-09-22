@@ -7,6 +7,7 @@ kv_config，缺失回退 config.yaml。后续扩展新配置段只需加字段�
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -14,8 +15,17 @@ import yaml
 from pydantic import BaseModel, Field
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-CONFIG_PATH = PROJECT_ROOT / "backend" / "config.yaml"
-DATA_DIR = PROJECT_ROOT / "data"
+
+
+def _env_path(name: str, default: Path) -> Path:
+    """环境变量重定位目录（容器部署用）；未设置或为空时用默认值。"""
+    raw = os.environ.get(name, "").strip()
+    return Path(raw).expanduser() if raw else default
+
+
+# 容器部署通过 AUTOREPLY_CONFIG / AUTOREPLY_DATA 重定位；默认保持源码布局。
+CONFIG_PATH = _env_path("AUTOREPLY_CONFIG", PROJECT_ROOT / "backend" / "config.yaml")
+DATA_DIR = _env_path("AUTOREPLY_DATA", PROJECT_ROOT / "data")
 
 
 # ---------- 配置段模型 ----------
@@ -100,13 +110,28 @@ class AppConfig(BaseModel):
 # 设计：llm.* / persona.* / engine.* 全路径均可被 kv_config 覆盖。
 # 为避免与主配置耦合，覆盖解析放在 app/api/routes_config.py。
 
+def _apply_env_overrides(cfg: AppConfig) -> AppConfig:
+    """容器部署注入口：OneBot token 与端口可用环境变量覆盖。
+
+    容器里可以完全不带 config.yaml（load_config 容缺席），token 由编排方
+    （插件 ComposeProvider）生成并同值注入 NapCat 侧，实现自动对齐。
+    """
+    token = os.environ.get("AUTOREPLY_ONEBOT_TOKEN", "").strip()
+    if token:
+        cfg.onebot.access_token = token
+    port = os.environ.get("AUTOREPLY_PORT", "").strip()
+    if port.isdigit() and 0 < int(port) < 65536:
+        cfg.server.port = int(port)
+    return cfg
+
+
 def load_config(path: Optional[Path] = None) -> AppConfig:
     path = path or CONFIG_PATH
     if path.exists():
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     else:
         data = {}
-    return AppConfig(**data)
+    return _apply_env_overrides(AppConfig(**data))
 
 
 def save_config(cfg: AppConfig, path: Optional[Path] = None) -> None:

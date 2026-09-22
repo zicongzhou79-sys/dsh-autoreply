@@ -1,0 +1,7 @@
+# 不烤进镜像的本地文件：含真实 token 的配置、测试与缓存
+config.yaml
+tests/
+__pycache__/
+*.pyc
+Dockerfile
+.dockerignore

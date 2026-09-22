@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### 新增：后端容器化基础（B 方案 B1）
+
+- 目标：插件 ComposeProvider 全托管的后端进容器做准备。本批交付
+  「配置环境变量化 + 后端镜像 + 容器冒烟验证」。
+- `backend/app/config.py`：
+  - `CONFIG_PATH`/`DATA_DIR` 支持 `AUTOREPLY_CONFIG`/`AUTOREPLY_DATA`
+    环境变量重定位（默认仍为源码布局，宿主机部署不受影响）；
+  - 新增 `_apply_env_overrides`：容器形态可不带 config.yaml，
+    `AUTOREPLY_ONEBOT_TOKEN`（token 注入，供编排方与 NapCat 同值对齐）
+    与 `AUTOREPLY_PORT` 覆盖配置。
+- 新增 `backend/Dockerfile`：python:3.11-slim、非 root（uid 10001）、
+  数据卷 `/data`；`PIP_INDEX_URL` 构建参数（默认官方源，受限网络可换镜像源）；
+  `.dockerignore` 防止本地含真实 token 的 config.yaml 进入镜像。
+- 新增 `scripts/verify_container.sh`：容器冒烟验证（无 yaml 纯 env 启动 /
+  API 可用 / token 注入 / SQLite 落卷 / 非 root），已实测 5/5 通过。
+- 新增自测 `backend/tests/test_config_env.py`（5 项）。
+- 实测记录：本机 legacy docker builder 的 `COPY --chown` 只认数字 ID
+  （宿主 umask 077 文件 600，必须 `--chown=10001:10001`）；PyPI 官方源
+  不可达时用 `--build-arg PIP_INDEX_URL=<镜像>` 构建。
+
 ### 修复：「send:OneBot WS 未连接」半开连接死锁
 
 - 现象：QQ 掉线重登后消息收得到、AI 回复也生成了，但发送一直报
