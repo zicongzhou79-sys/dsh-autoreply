@@ -93,11 +93,17 @@ class OneBotWSServer:
         try:
             while True:
                 raw = await ws.receive_text()
+                # 收到任何帧都证明连接活着。看门狗可能在无数据期间（如 QQ
+                # 掉线又重登）把连接标记为离线，而 TCP 其实没断；此时必须
+                # 恢复在线，否则消息收得到、回复发不出（「OneBot WS 未连接」）。
+                if not self.is_online:
+                    self.is_online = True
+                    log.info("连接恢复在线（重新收到数据）")
+                self._last_heartbeat = time.time()
                 try:
                     frame = json.loads(raw)
                 except json.JSONDecodeError:
                     continue
-                self._last_heartbeat = time.time()
                 self._route(frame)
         except WebSocketDisconnect:
             pass
@@ -176,12 +182,28 @@ class OneBotWSServer:
 
     # ---------- 心跳看门狗 ----------
 
+    async def _check_watchdog(self) -> None:
+        """心跳超时判定：标记离线并主动关闭半开连接。
+
+        只标记离线不关连接的话，NapCat 侧的 WS 客户端会一直认为连接正常、
+        永不重连（半开连接），后端也就永远等不到重连。主动 close 才能触发
+        NapCat 的反向 WS 重连。
+        """
+        if not (self.is_online and time.time() - self._last_heartbeat > self.cfg.heartbeat_timeout_s):
+            return
+        log.warning("心跳超时（%.0fs 无数据），关闭连接等待 NapCat 重连",
+                    time.time() - self._last_heartbeat)
+        self.is_online = False
+        self.login_info = None
+        ws, self.connection = self.connection, None
+        if ws is not None:
+            try:
+                await ws.close(code=4001, reason="heartbeat timeout")
+            except Exception:
+                log.debug("关闭心跳超时连接失败", exc_info=True)
+
     async def _watchdog_loop(self) -> None:
         interval = 10.0
         while True:
             await asyncio.sleep(interval)
-            if self.is_online and time.time() - self._last_heartbeat > self.cfg.heartbeat_timeout_s:
-                log.warning("心跳超时（%.0fs 无数据），标记离线",
-                            time.time() - self._last_heartbeat)
-                self.is_online = False
-                self.login_info = None
+            await self._check_watchdog()

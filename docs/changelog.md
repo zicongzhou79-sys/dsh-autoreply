@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### 修复：「send:OneBot WS 未连接」半开连接死锁
+
+- 现象：QQ 掉线重登后消息收得到、AI 回复也生成了，但发送一直报
+  「OneBot WS 未连接」；面板显示「回复失败，未发送到 QQ」。
+- 根因：NapCat 与后端的 WS 长时间无心跳后，看门狗只把 `is_online` 标为
+  False 而**不关闭连接**——TCP 仍在，NapCat 认为连接正常永不重连，后端
+  收到数据也不会恢复在线，双向死锁。
+- 修复（`backend/app/onebot/ws_server.py`）：
+  1. 收帧循环收到任何帧即恢复在线（连接活着就能发）；
+  2. 心跳超时改为主动 `close(4001)`，触发 NapCat 反向 WS 重连。
+- 新增自测 `backend/tests/test_ws_server.py`（自愈恢复 / 超时关连接 /
+  健康连接不动 / 离线快速失败）。
+
 ### 修复：会话绑定区读不到模型与 Agent preset
 
 - 根因：面板用 `connection.api.*` 读 DSH 目录，而当前 DSH 的客户端 `connection`
