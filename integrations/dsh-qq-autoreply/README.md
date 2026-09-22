@@ -54,20 +54,25 @@ dsh plugin --profile web add /path/to/dsh-qq-autoreply
 
 ### compose —— 插件全托管（推荐新用户）
 
-```bash
-# DSH 环境（或插件进程环境）加：
-AUTOREPLY_PROVIDER=compose
-# 可选：AUTOREPLY_IMAGE=<后端镜像>，默认 qq-autoreply-backend:latest
-```
+**零配置自动检测**：只要 `~/.dsh/qq-autoreply/provision.json` 存在，
+插件重启后自动进入 compose 托管模式；显式 `AUTOREPLY_PROVIDER=compose`
+始终可强制指定（未供给时用于全新安装）。
 
 之后全部通过工具/面板完成：
 
-1. `qq_autoreply_compose_provision` 传 `account`（QQ 号）→ 在
+1. `qq_autoreply_compose_provision` 传 `account`（QQ 号，可选
+   `workspace_dir`/`session_dir` 保留每会话目录能力）→ 在
    `~/.dsh/qq-autoreply/` 生成 compose.yml/.env/NapCat 配置；
    **token 自动生成并同值注入后端与 NapCat**，无需手工对齐
 2. `qq_autoreply_service_control {action:"start"}` → 拉起 backend（健康门控）
-   + napcat
-3. 打开 `http://127.0.0.1:6099/webui/` 扫码登录（WebUI token 见 provision.json）
+   + napcat；backend 与宿主共享网络栈（DSH 回环直达），NapCat 经
+   `backend:host-gateway` 回连
+3. 面板「QQ 登录」区内嵌 NapCat WebUI（compose 模式自动带 token，免登录
+   直接扫码）；「托管与安装」区展示栈服务状态与安装体检
+
+后端镜像默认 `qq-autoreply-backend:latest`；已发布镜像：
+`ghcr.io/zicongzhou79-sys/dsh-autoreply-backend`（`v0.3.0` / `latest`，
+匿名可拉，amd64+arm64）。
 
 要点：反向 WS 走 compose 网络内 `ws://backend:8001/onebot/ws`（不依赖
 docker0 网桥地址）；所有端口只绑 127.0.0.1；stop 只停 backend，NapCat
@@ -77,8 +82,9 @@ docker0 网桥地址）；所有端口只绑 127.0.0.1；stop 只停 backend，N
 
 插件控制入口位于 DSH 侧栏设置入口同一组操作区域，点击后打开 QQ AutoReply 控制面板。当前面板已经接入：
 
-- 一键启动/停止 NapCat 与 AutoReply 后端，并控制总开关
-- QQ 登录状态和 NapCat WebUI 扫码入口
+- 一键启动/停止 NapCat 与 AutoReply 后端，并控制总开关（compose 感知）
+- QQ 登录状态和 NapCat WebUI 扫码入口（compose 模式免 token 直达）
+- 「托管与安装」区：托管模式/账号/端口/栈服务状态/安装体检
 - DSH 模型目录 / Agent preset / workspace 选择（会话绑定区内）
 
 模型、Agent preset 与 workspace 通过 DSH 客户端 remote 命名空间读取
